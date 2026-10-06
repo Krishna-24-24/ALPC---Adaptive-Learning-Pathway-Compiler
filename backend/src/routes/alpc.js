@@ -1,0 +1,287 @@
+'use strict';
+
+const express  = require('express');
+const Mastery  = require('../models/Mastery');
+const Pathway  = require('../models/Pathway');
+const CompilerDecision = require('../models/CompilerDecision');
+const { authMiddleware } = require('../middleware/auth');
+const alpcRunner         = require('../services/alpcRunner');
+const { parseCompilerResult } = require('../services/resultParser');
+const { generateForStudent, generatePathLang, validate } = require('../services/pathwayGenerator');
+
+const router = express.Router();
+
+// ─── Outcome → Content Mapping ────────────────────────────────────────────────
+// Configurable: describes what each compiler outcome means for LearnSmart.
+const OUTCOME_CONTENT = {
+  remedial: {
+    label: 'Remedial Path',
+    tier: 'remedial',
+    color: 'rose',
+    description: 'Foundational reinforcement — revisit core concepts before moving on.',
+    steps: [
+      'Review foundational concepts',
+      'Watch concept explainer video',
+      'Attempt easy practice questions',
+      'Re-take diagnostic quiz',
+    ],
+    nextAction: 'Start with the basics',
+  },
+  practice: {
+    label: 'Practice Path',
+    tier: 'practice',
+    color: 'amber',
+    description: 'Consolidation — reinforce understanding through guided practice.',
+    steps: [
+      'Review core concepts',
+      'Attempt medium-difficulty practice quiz',
+      'Identify and review mistakes',
+      'Attempt full adaptive quiz',
+    ],
+    nextAction: 'Keep practising',
+  },
+  core: {
+    label: 'Core Path',
+    tier: 'core',
+    color: 'indigo',
+    description: 'Standard progression — solid grasp, ready for the main lesson.',
+    steps: [
+      'Complete the standard lesson',
+      'Attempt intermediate assessment',
+      'Review errors and explanations',
+      'Proceed to next topic',
+    ],
+    nextAction: 'Continue learning',
+  },
+  advanced: {
+    label: 'Advanced Path',
+    tier: 'advanced',
+    color: 'emerald',
+    description: 'Accelerated progression — mastery achieved, tackle advanced challenges.',
+    steps: [
+      'Tackle the advanced lesson',
+      'Solve challenge / extension problems',
+      'Explore related topics',
+      'Mentor or review peer solutions',
+    ],
+    nextAction: 'Push further',
+  },
+};
+
+function getContent(outcome) {
+  if (!outcome) return null;
+  return OUTCOME_CONTENT[outcome.toLowerCase()] || {
+    label: outcome,
+    tier: outcome,
+    color: 'gray',
+    description: `Selected pathway: ${outcome}`,
+    steps: [],
+    nextAction: 'Proceed',
+  };
+}
+
+// ─── POST /api/alpc/compile ──────────────────────────────────────────────────
+// Compile raw Path-Lang source. No auth required (playground).
+router.post('/compile', async (req, res) => {
+  try {
+    const { source } = req.body;
+    if (typeof source !== 'string' || !source.trim()) {
+      return res.status(400).json({ error: '"source" string is required' });
+    }
+    const runnerResult = await alpcRunner.compile(source);
+    const parsed       = parseCompilerResult(runnerResult, source);
+    return res.json({
+      success:        parsed.success,
+      outcome:        parsed.outcome,
+      alignmentScore: parsed.alignmentScore,
+      binaryOutput:   parsed.binaryOutput,
+      tokens:         parsed.tokens,
+      traceLines:     parsed.traceLines,
+      ast:            parsed.ast,
+      irSource:       parsed.irSource,
+      stages:         parsed.stages,
+      diagnostics:    parsed.diagnostics,
+      content:        getContent(parsed.outcome),
+    });
+  } catch (err) {
+    console.error('[alpc/compile]', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/alpc/pathway/generate ─────────────────────────────────────────
+// Generate Path-Lang from student state, compile it, persist result. Auth required.
+router.post('/pathway/generate', authMiddleware, async (req, res) => {
+  try {
+    const { skill, pathwayId, performance, mastery, attempts, completionRate } = req.body;
+    if (!skill) return res.status(400).json({ error: '"skill" is required' });
+
+    // Resolve mastery from DB if not provided
+    let masteryScore = mastery;
+    if (masteryScore == null) {
+      const rec = await Mastery.findOne({ userId: req.user.id, skill });
+      masteryScore = rec ? rec.masteryScore : 0.3;
+    }
+
+    // Resolve performance: use provided or derive from mastery
+    let perfScore = performance;
+    if (perfScore == null) {
+      perfScore = (masteryScore <= 1 ? masteryScore : masteryScore / 100) * 100;
+    }
+
+    // Load custom pathway if specified
+    let pathway = null;
+    if (pathwayId) {
+      pathway = await Pathway.findById(pathwayId);
+    }
+
+    // Generate Path-Lang source
+    const source = generateForStudent({
+      studentData: { performance: perfScore, mastery: masteryScore, attempts, completionRate },
+      pathway,
+    });
+
+    // Compile via real ALPC binary
+    const runnerResult = await alpcRunner.compile(source);
+    const parsed       = parseCompilerResult(runnerResult, source);
+
+    // Persist compiler decision for traceability
+    let decisionId = null;
+    try {
+      const saved = await CompilerDecision.create({
+        userId:         req.user.id,
+        skill,
+        pathwayId:      pathway ? pathway._id : undefined,
+        pathLangSource: source,
+        outcome:        parsed.outcome,
+        alignmentScore: parsed.alignmentScore,
+        binaryOutput:   parsed.binaryOutput,
+        stages: parsed.stages.map(s => ({
+          id:       s.id,
+          status:   s.status,
+          stdout:   (s.stdout || '').slice(0, 4000),
+          stderr:   (s.stderr || '').slice(0, 1000),
+          exitCode: s.exitCode,
+        })),
+        performance: perfScore,
+        mastery:     masteryScore,
+      });
+      decisionId = saved._id;
+    } catch (saveErr) {
+      console.warn('[alpc] Failed to save CompilerDecision:', saveErr.message);
+    }
+
+    return res.json({
+      success:        parsed.success,
+      source,
+      outcome:        parsed.outcome,
+      alignmentScore: parsed.alignmentScore,
+      binaryOutput:   parsed.binaryOutput,
+      tokens:         parsed.tokens,
+      traceLines:     parsed.traceLines,
+      ast:            parsed.ast,
+      irSource:       parsed.irSource,
+      stages:         parsed.stages,
+      diagnostics:    parsed.diagnostics,
+      content:        getContent(parsed.outcome),
+      decisionId,
+    });
+  } catch (err) {
+    console.error('[alpc/pathway/generate]', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/alpc/decisions ─────────────────────────────────────────────────
+router.get('/decisions', authMiddleware, async (req, res) => {
+  try {
+    const decisions = await CompilerDecision.find({ userId: req.user.id })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .select('-stages.stdout -stages.stderr -pathLangSource');
+    return res.json({ decisions });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/alpc/decisions/:id ─────────────────────────────────────────────
+router.get('/decisions/:id', authMiddleware, async (req, res) => {
+  try {
+    const decision = await CompilerDecision.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!decision) return res.status(404).json({ error: 'Decision not found' });
+    return res.json({ decision });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/alpc/pathways ───────────────────────────────────────────────────
+router.get('/pathways', authMiddleware, async (req, res) => {
+  try {
+    const pathways = await Pathway.find().sort({ createdAt: -1 }).limit(50);
+    return res.json({ pathways });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/alpc/pathways ──────────────────────────────────────────────────
+router.post('/pathways', authMiddleware, async (req, res) => {
+  try {
+    const { name, topic, description, outcomes, rules } = req.body;
+    if (!name || !topic || !outcomes || !rules) {
+      return res.status(400).json({ error: 'name, topic, outcomes, and rules are required' });
+    }
+    const errors = validate(outcomes, rules);
+    if (errors.length) return res.status(400).json({ error: errors.join('; ') });
+
+    const defaultPathLang = generatePathLang({
+      outcomes,
+      variables: { performance: 50, state: 0 },
+      rules,
+    });
+    const pathway = await Pathway.create({
+      name, topic, description: description || '',
+      outcomes, rules, defaultPathLang,
+      createdBy: req.user.id,
+    });
+    return res.status(201).json({ pathway });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/alpc/pathways/:id/simulate ────────────────────────────────────
+router.post('/pathways/:id/simulate', authMiddleware, async (req, res) => {
+  try {
+    const pathway = await Pathway.findById(req.params.id);
+    if (!pathway) return res.status(404).json({ error: 'Pathway not found' });
+
+    const { performance = 50, mastery = 0.5, attempts, completionRate } = req.body;
+    const source = generateForStudent({
+      studentData: { performance, mastery, attempts, completionRate },
+      pathway,
+    });
+    const runnerResult = await alpcRunner.compile(source);
+    const parsed       = parseCompilerResult(runnerResult, source);
+    return res.json({
+      success:        parsed.success,
+      source,
+      outcome:        parsed.outcome,
+      alignmentScore: parsed.alignmentScore,
+      binaryOutput:   parsed.binaryOutput,
+      tokens:         parsed.tokens,
+      traceLines:     parsed.traceLines,
+      ast:            parsed.ast,
+      irSource:       parsed.irSource,
+      stages:         parsed.stages,
+      diagnostics:    parsed.diagnostics,
+      content:        getContent(parsed.outcome),
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+module.exports = router;
