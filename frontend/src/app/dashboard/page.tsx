@@ -140,6 +140,29 @@ export default function DashboardPage() {
             </section>
           )}
 
+          {data.review && data.review.length > 0 && (
+            <section aria-labelledby="review-h">
+              <h2 id="review-h" className="text-lg">Due for review</h2>
+              <p className="mt-1 text-sm t-graphite">
+                Topics you have not practised for a while. Weaker topics come back sooner: every 2 days below 40%,
+                every 4 below 70%, otherwise weekly.
+              </p>
+              <ul className="mt-3 divide-y divide-[var(--rule-soft)] border-y border-[var(--rule-soft)]">
+                {data.review.slice(0, 4).map(r => (
+                  <li key={r.skill} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2.5">
+                    <div>
+                      <p className="font-medium">{r.skill}</p>
+                      <p className="text-sm t-graphite">
+                        Last practised {r.daysSince} days ago · mastery <span className="t-num">{r.masteryPercent}%</span>
+                      </p>
+                    </div>
+                    <Link href={`/quiz/adaptive?skill=${encodeURIComponent(r.skill)}`} className="btn btn-outline btn-sm">Review</Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {weakest && (
             <AdaptiveEngineSection
               skill={weakest.skill}

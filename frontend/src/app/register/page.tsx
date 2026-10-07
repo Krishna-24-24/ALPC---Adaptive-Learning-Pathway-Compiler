@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { api, setToken, setUser } from '@/lib/api';
+import { api, ApiError, setToken, setUser } from '@/lib/api';
 import { AuthLayout, PasswordField } from '@/components/layout/AuthForm';
 
 export default function RegisterPage() {
@@ -12,11 +12,13 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [taken, setTaken] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    setTaken(false);
     setLoading(true);
     try {
       const data = await api.register({ name, email, password });
@@ -24,6 +26,7 @@ export default function RegisterPage() {
       if (data.user) setUser(data.user);
       router.push('/quiz/diagnostic');
     } catch (err) {
+      setTaken(err instanceof ApiError && err.code === 'EMAIL_TAKEN');
       setError(err instanceof Error ? err.message : 'The request failed.');
     } finally {
       setLoading(false);
@@ -36,7 +39,12 @@ export default function RegisterPage() {
       intro={<>After signing up you take a 15-question diagnostic, which sets your starting mastery in each topic. Already registered? <Link href="/login" className="link">Sign in</Link>.</>}
     >
       <form onSubmit={handleSubmit} className="space-y-5">
-        {error && <p className="notice notice-error" role="alert">{error}</p>}
+        {error && (
+          <p className="notice notice-error" role="alert">
+            {error}
+            {taken && <> <Link href={`/login?email=${encodeURIComponent(email)}`} className="link">Sign in instead</Link>.</>}
+          </p>
+        )}
         <div>
           <label htmlFor="reg-name" className="label">Name</label>
           <input id="reg-name" required autoComplete="name" value={name} onChange={e => setName(e.target.value)} className="field" />

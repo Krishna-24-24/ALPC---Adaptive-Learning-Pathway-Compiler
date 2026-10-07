@@ -49,6 +49,7 @@ export function Sidebar() {
         <Link href="/dashboard" className="text-[1.0625rem] font-semibold tracking-tight no-underline">ALPC</Link>
         <div className="flex items-center lg:hidden">
           <ThemeButton />
+          <Link href="/account" className="btn btn-quiet btn-sm">Account</Link>
           <button type="button" onClick={signOut} className="btn btn-quiet btn-sm">Sign out</button>
         </div>
       </div>
@@ -81,10 +82,10 @@ export function Sidebar() {
 
       <div className="hidden border-t border-[var(--rule)] px-5 py-4 text-sm lg:block">
         {user && (
-          <div className="mb-3 min-w-0">
+          <Link href="/account" className="mb-3 block min-w-0 no-underline hover:underline hover:underline-offset-4">
             <p className="truncate font-medium">{user.name}</p>
             <p className="truncate text-xs t-graphite">{user.email}</p>
-          </div>
+          </Link>
         )}
         <div className="-ml-2 flex flex-col items-start">
           <ThemeButton />

@@ -52,9 +52,10 @@ export default function PrivacyPage() {
 
       <h2>Deleting your data</h2>
       <p>
-        There is no delete button yet. To remove your account and everything linked to it, open an issue on the
-        project’s GitHub repository or ask the person who runs your copy of the app, and they can delete it from the
-        database.
+        Open Account (from the sidebar, or your name at the bottom of it) and choose Delete my account. After you
+        confirm with your password, the account and everything listed above is removed from the database straight
+        away: answers, mastery, recommendations, compiler decisions, study progress and the pathways you built.
+        Nothing is kept.
       </p>
     </DocPage>
   );

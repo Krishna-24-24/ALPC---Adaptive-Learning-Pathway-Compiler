@@ -1,6 +1,7 @@
 import { highlightPathLang } from '@/lib/pathlang';
 
-const RULE_RE = /^\s*IF\s+\w+\s*(<=|>=|==|!=|<|>)\s*\d+\s+GOTO\s+(\w+)\s*;/;
+// IF <condition, possibly with AND/OR> GOTO <outcome>;
+const RULE_RE = /^\s*IF\s+(.+?)\s+GOTO\s+(\w+)\s*;/;
 
 /**
  * A Path-Lang program with the rule that decided the outcome underlined.

@@ -15,13 +15,13 @@ export function AuthLayout({ title, intro, children }: { title: string; intro: R
 }
 
 export function PasswordField({
-  id, value, onChange, autoComplete, hint,
-}: { id: string; value: string; onChange: (v: string) => void; autoComplete: string; hint?: string }) {
+  id, value, onChange, autoComplete, hint, label = 'Password',
+}: { id: string; value: string; onChange: (v: string) => void; autoComplete: string; hint?: string; label?: string }) {
   const [show, setShow] = useState(false);
   return (
     <div>
       <div className="flex items-baseline justify-between">
-        <label htmlFor={id} className="label">Password</label>
+        <label htmlFor={id} className="label">{label}</label>
         <button type="button" className="btn btn-quiet btn-sm -mr-2 min-h-0" onClick={() => setShow(s => !s)} aria-controls={id}>
           {show ? 'Hide' : 'Show'}
         </button>

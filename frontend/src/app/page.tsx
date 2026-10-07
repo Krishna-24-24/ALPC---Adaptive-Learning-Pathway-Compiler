@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { getToken } from '@/lib/api';
 import { MarkedListing, useDemoRun, type DemoRun } from '@/components/landing/MarkedListing';
 
 /** One line per AST node kind with its count, read from the compiler's --dump-ast output. */
@@ -73,6 +75,9 @@ const REFERENCE = [
 ];
 
 export default function LandingPage() {
+  // Signed-in visitors get their dashboard instead of the sign-up link.
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => { setSignedIn(Boolean(getToken())); }, []);
   const { performance, setPerformance, run, state } = useDemoRun();
   const stages = stageExcerpts(run);
 
@@ -91,7 +96,9 @@ export default function LandingPage() {
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/compiler" className="btn btn-primary">Open the playground</Link>
-            <Link href="/register" className="btn btn-outline">Create an account</Link>
+            {signedIn
+              ? <Link href="/dashboard" className="btn btn-outline">Go to your dashboard</Link>
+              : <Link href="/register" className="btn btn-outline">Create an account</Link>}
           </div>
 
           <div className="mt-10 max-w-[22rem]">

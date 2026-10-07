@@ -190,10 +190,12 @@ export default function StudyTopicPage() {
         <section aria-labelledby="test-h" className="panel p-5">
           <h2 id="test-h" className="text-lg">Test yourself</h2>
           <p className="mt-2 text-[0.9375rem]">
-            When you have worked through these, take a practice quiz. Your answers update your mastery, and the next
-            time you open this page a new pathway is compiled from it.
+            When you have worked through these, take a five-question quiz on {page.skill}. Your answers update your
+            mastery, and the next time you open this page a new pathway is compiled from it.
           </p>
-          <Link href="/quiz/adaptive" className="btn btn-primary btn-sm mt-4">Take a practice quiz</Link>
+          <Link href={`/quiz/adaptive?skill=${encodeURIComponent(page.skill)}`} className="btn btn-primary btn-sm mt-4">
+            Quiz me on {page.skill}
+          </Link>
         </section>
 
         {page.others.length > 0 && (

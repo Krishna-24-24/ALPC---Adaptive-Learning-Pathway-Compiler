@@ -10,10 +10,14 @@ export default function AdaptiveQuizPage() {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // ?skill=Trees gives a five-question quiz on that topic only (from a study page).
+  const [topic, setTopic] = useState<string | null>(null);
 
   useEffect(() => {
     if (!getToken()) { router.push('/login'); return; }
-    api.getAdaptiveQuiz()
+    const skill = new URLSearchParams(window.location.search).get('skill');
+    setTopic(skill);
+    api.getAdaptiveQuiz(skill || undefined)
       .then(data => setQuestions(data.questions))
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
@@ -21,7 +25,7 @@ export default function AdaptiveQuizPage() {
 
   async function handleSubmit(answers: { questionId: string; selectedOption: number }[]) {
     const result: AdaptiveResult = await api.submitAdaptive(answers);
-    sessionStorage.setItem('learnsmart_quiz_result', JSON.stringify(result));
+    sessionStorage.setItem('learnsmart_quiz_result', JSON.stringify({ ...result, topic }));
     router.push('/quiz/results');
   }
 
@@ -37,8 +41,10 @@ export default function AdaptiveQuizPage() {
   return (
     <QuizUI
       questions={questions}
-      title="Practice quiz"
-      subtitle="Ten questions, picked for the topics you are weakest in"
+      title={topic ? `${topic} quiz` : 'Practice quiz'}
+      subtitle={topic
+        ? `${questions.length || 5} questions on ${topic}, at a difficulty matched to your mastery`
+        : 'Ten questions, picked for the topics you are weakest in'}
       onSubmit={handleSubmit}
       loading={loading}
     />

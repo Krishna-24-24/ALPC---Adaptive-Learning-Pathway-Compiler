@@ -55,7 +55,14 @@ export default function QuizUI({ questions, title, subtitle, onSubmit, loading }
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await onSubmit(questions.map(question => ({ questionId: question.id, selectedOption: answers[question.id] ?? 0 })));
+      // Only answered questions are sent. Each answer is the stored index of
+      // the chosen option, because the server shuffles the order it shows.
+      await onSubmit(questions
+        .filter(question => answers[question.id] !== undefined)
+        .map(question => {
+          const shown = answers[question.id];
+          return { questionId: question.id, selectedOption: question.optionIndex?.[shown] ?? shown };
+        }));
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Your answers were not submitted.');
     } finally {

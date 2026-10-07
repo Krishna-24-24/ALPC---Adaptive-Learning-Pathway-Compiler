@@ -19,18 +19,19 @@ export default function ResultsPage() {
   useEffect(() => {
     const raw = sessionStorage.getItem('learnsmart_quiz_result');
     if (!raw) { router.push('/dashboard'); return; }
-    const parsed: AdaptiveResult = JSON.parse(raw);
+    const parsed: AdaptiveResult & { topic?: string | null } = JSON.parse(raw);
     setResult(parsed);
 
     // Compile the student's next step with ALPC from this quiz's numbers.
-    const skill = parsed.recommendations?.[0]?.skill || parsed.results?.[0]?.skill;
+    // A topic quiz decides for that topic; a mixed quiz for the weakest one.
+    const skill = parsed.topic || parsed.recommendations?.[0]?.skill || parsed.results?.[0]?.skill;
     if (skill) {
       setStudySkill(skill);
       setCompiling(true);
       api.generatePathway({
         skill,
         performance: parsed.summary.scorePercent,
-        mastery: parsed.recommendations?.[0]?.masteryScore ?? 0.5,
+        mastery: parsed.masteryMap?.[skill] ?? parsed.recommendations?.[0]?.masteryScore ?? 0.5,
       })
         .then(setDecision)
         .catch(err => setDecisionError(err instanceof Error ? err.message : 'The compiler decision failed.'))
@@ -127,21 +128,25 @@ export default function ResultsPage() {
 
         <section aria-labelledby="answers-h">
           <h2 id="answers-h" className="text-lg">Your answers</h2>
-          <div className="mt-3 overflow-x-auto">
-            <table className="table">
-              <thead><tr><th className="w-10">#</th><th>Topic</th><th>Answer</th><th className="text-right">Mastery after</th></tr></thead>
-              <tbody>
-                {results.map((r, i) => (
-                  <tr key={r.questionId}>
-                    <td className="t-faint t-num">{i + 1}</td>
-                    <td>{r.skill}</td>
-                    <td className={r.correct ? 't-pass' : 't-mark'}>{r.correct ? 'Correct' : 'Wrong'}</td>
-                    <td className="text-right t-num">{Math.round(r.updatedMastery * 100)}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <p className="mt-1 text-sm t-graphite">Wrong answers first, each with the right answer and why.</p>
+          <ol className="mt-3 divide-y divide-[var(--rule-soft)] border-y border-[var(--rule-soft)]">
+            {[...results].sort((a, b) => Number(a.correct) - Number(b.correct)).map(r => (
+              <li key={r.questionId} className="py-4">
+                <p className="text-xs t-graphite">
+                  {r.skill} · <span className={r.correct ? 't-pass' : 't-mark'}>{r.correct ? 'Correct' : 'Wrong'}</span> · mastery now{' '}
+                  <span className="t-num">{Math.round(r.updatedMastery * 100)}%</span>
+                </p>
+                {r.question && <p className="mt-1 font-medium">{r.question}</p>}
+                {!r.correct && r.yourAnswer != null && (
+                  <p className="mt-1 text-sm">You chose: <span className="t-mark">{r.yourAnswer}</span></p>
+                )}
+                {r.correctAnswer && (
+                  <p className="mt-0.5 text-sm">{r.correct ? 'Answer' : 'Right answer'}: <span className="font-medium">{r.correctAnswer}</span></p>
+                )}
+                {r.explanation && <p className="mt-1 text-sm t-graphite">{r.explanation}</p>}
+              </li>
+            ))}
+          </ol>
         </section>
 
         {recommendations.length > 1 && (
@@ -161,7 +166,10 @@ export default function ResultsPage() {
 
         <div className="flex flex-wrap gap-3">
           <Link href="/dashboard" className="btn btn-primary">Back to the dashboard</Link>
-          <Link href="/quiz/adaptive" className="btn btn-outline">Take another practice quiz</Link>
+          {studySkill && (
+            <Link href={`/quiz/adaptive?skill=${encodeURIComponent(studySkill)}`} className="btn btn-outline">Another {studySkill} quiz</Link>
+          )}
+          <Link href="/quiz/adaptive" className="btn btn-quiet">Mixed practice quiz</Link>
         </div>
       </div>
     </div>

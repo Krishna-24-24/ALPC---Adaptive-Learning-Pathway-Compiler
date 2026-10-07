@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, setToken, setUser } from '@/lib/api';
@@ -9,6 +9,11 @@ import { AuthLayout, PasswordField } from '@/components/layout/AuthForm';
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
+  // Filled in when you arrive from "Sign in instead" on the register page.
+  useEffect(() => {
+    const prefill = new URLSearchParams(window.location.search).get('email');
+    if (prefill) setEmail(prefill);
+  }, []);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);

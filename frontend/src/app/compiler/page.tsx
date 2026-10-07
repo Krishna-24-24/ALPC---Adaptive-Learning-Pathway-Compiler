@@ -8,6 +8,8 @@ import { TokenTable } from '@/components/alpc/TokenTable';
 import { AstTree } from '@/components/alpc/AstTree';
 import { OutcomeCard } from '@/components/alpc/OutcomeCard';
 import { backwardDesignStatus } from '@/components/alpc/types';
+import { ControlFlowGraph } from '@/components/alpc/ControlFlowGraph';
+import { OptimizedIr } from '@/components/alpc/OptimizedIr';
 
 const EXAMPLES = [
   {
@@ -42,6 +44,24 @@ IF performance < 85 GOTO core;
 IF performance >= 85 GOTO advanced;`,
   },
   {
+    id: 'and-or',
+    label: 'Rules with AND and OR',
+    source: `OUTCOME remedial;
+OUTCOME practice;
+OUTCOME core;
+OUTCOME advanced;
+
+SET performance = 74;
+SET mastery = 35;
+SET state = 74;
+
+# AND binds tighter than OR; brackets group.
+IF performance < 50 OR mastery < 25 GOTO remedial;
+IF performance >= 85 AND mastery >= 70 GOTO advanced;
+IF (performance < 70 OR mastery < 40) AND performance >= 50 GOTO practice;
+IF performance >= 50 GOTO core;`,
+  },
+  {
     id: 'binary',
     label: 'Score adjustments and binary output',
     source: `OUTCOME remedial += 5;
@@ -69,7 +89,7 @@ OUTCOME core;`,
   },
 ];
 
-type TabId = 'result' | 'pipeline' | 'tokens' | 'parse' | 'ast' | 'ir';
+type TabId = 'result' | 'pipeline' | 'tokens' | 'parse' | 'ast' | 'ir' | 'cfg' | 'opt';
 
 export default function CompilerPlayground() {
   const [source, setSource] = useState(EXAMPLES[0].source);
@@ -134,6 +154,8 @@ export default function CompilerPlayground() {
     { id: 'parse', label: 'Parse trace', count: result?.traceLines?.length || undefined },
     { id: 'ast', label: 'AST' },
     { id: 'ir', label: 'LLVM IR' },
+    { id: 'cfg', label: 'Control flow' },
+    { id: 'opt', label: 'Optimized' },
   ];
 
   return (
@@ -228,6 +250,14 @@ export default function CompilerPlayground() {
                   )
                 )}
                 {tab === 'ast' && <AstTree ast={result?.ast || null} />}
+                {tab === 'cfg' && (
+                  result?.irSource
+                    ? <ControlFlowGraph ir={result.irSource} />
+                    : <p className="py-8 text-sm t-graphite">No IR was generated because compilation stopped earlier.</p>
+                )}
+                {tab === 'opt' && (
+                  <OptimizedIr before={result?.irSource || ''} after={result?.optimizedIr} error={result?.optimizeError} />
+                )}
                 {tab === 'ir' && (
                   result?.irSource ? (
                     <div className="space-y-2">

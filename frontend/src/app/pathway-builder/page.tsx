@@ -1,13 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { api, type AlpcCompileResult, type AlpcPathway } from '@/lib/api';
+import { api, type AlpcCompileResult, type AlpcPathway, type PathwayRule } from '@/lib/api';
 import { PipelineVisualization } from '@/components/alpc/PipelineVisualization';
 import { OutcomeCard } from '@/components/alpc/OutcomeCard';
 import { highlightPathLang } from '@/lib/pathlang';
 
 interface OutcomeEntry { name: string; adjustment: number }
-interface RuleEntry { variable: string; operator: string; value: number; outcome: string }
+type RuleEntry = PathwayRule;
+type Also = NonNullable<RuleEntry['also']>;
+
+function condition(r: RuleEntry) {
+  const first = `${r.variable} ${r.operator} ${r.value}`;
+  return r.also ? `${first} ${r.also.connector} ${r.also.variable} ${r.also.operator} ${r.also.value}` : first;
+}
 
 const OPERATORS = ['<', '>', '==', '!=', '<=', '>='];
 const VARIABLES = ['performance', 'mastery', 'attempts', 'completion_rate'];
@@ -26,7 +32,7 @@ function generatePathLang(outcomes: OutcomeEntry[], variables: Record<string, nu
   for (const [k, v] of Object.entries(variables)) lines.push(`SET ${k} = ${Math.round(v)};`);
   lines.push('SET state = 0;', '');
   for (const r of rules) {
-    if (r.variable && r.outcome.trim()) lines.push(`IF ${r.variable} ${r.operator} ${r.value} GOTO ${r.outcome.trim()};`);
+    if (r.variable && r.outcome.trim()) lines.push(`IF ${condition(r)} GOTO ${r.outcome.trim()};`);
   }
   return lines.join('\n');
 }
@@ -53,7 +59,7 @@ export default function PathwayBuilder() {
     { name: 'advanced', adjustment: 0 },
   ]);
   const [rules, setRules] = useState<RuleEntry[]>([
-    { variable: 'performance', operator: '<', value: 50, outcome: 'remedial' },
+    { variable: 'performance', operator: '<', value: 50, outcome: 'remedial', also: { connector: 'OR', variable: 'mastery', operator: '<', value: 30 } },
     { variable: 'performance', operator: '<', value: 70, outcome: 'practice' },
     { variable: 'performance', operator: '<', value: 85, outcome: 'core' },
     { variable: 'performance', operator: '>=', value: 85, outcome: 'advanced' },
@@ -81,6 +87,12 @@ export default function PathwayBuilder() {
     setOutcomes(prev => prev.map((o, k) => (k === i ? { ...o, ...patch } : o)));
   const updateRule = (i: number, patch: Partial<RuleEntry>) =>
     setRules(prev => prev.map((r, k) => (k === i ? { ...r, ...patch } : r)));
+  const updateAlso = (i: number, patch: Partial<Also> | null) =>
+    setRules(prev => prev.map((r, k) => {
+      if (k !== i) return r;
+      if (patch === null) { const { also: _drop, ...rest } = r; void _drop; return rest; }
+      return { ...r, also: { connector: 'AND', variable: 'mastery', operator: '<', value: 40, ...r.also, ...patch } };
+    }));
 
   const simulate = useCallback(async () => {
     setSimulating(true);
@@ -180,11 +192,15 @@ export default function PathwayBuilder() {
           <section aria-labelledby="rules-h" className="space-y-3">
             <div>
               <h2 id="rules-h" className="text-lg">Rules</h2>
-              <p className="mt-1 text-sm t-graphite">Checked from top to bottom. The first rule that holds decides the outcome.</p>
+              <p className="mt-1 text-sm t-graphite">
+                Checked from top to bottom. The first rule that holds decides the outcome. A rule can have a second
+                condition joined with AND (both must hold) or OR (either is enough).
+              </p>
             </div>
             <ol className="space-y-2">
               {rules.map((r, i) => (
-                <li key={i} className="flex flex-wrap items-center gap-2 text-sm sm:flex-nowrap">
+                <li key={i} className="space-y-2 text-sm">
+                 <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
                   <span className="w-5 text-right t-faint t-num">{i + 1}</span>
                   <span className="font-[family-name:var(--font-mono)] font-semibold">IF</span>
                   <select aria-label={`Rule ${i + 1} variable`} className="field field-mono w-auto min-w-0" value={r.variable}
@@ -206,6 +222,35 @@ export default function PathwayBuilder() {
                   <button type="button" className="btn btn-quiet btn-sm" onClick={() => setRules(prev => prev.filter((_, k) => k !== i))}>
                     Remove
                   </button>
+                 </div>
+                 {r.also ? (
+                  <div className="flex flex-wrap items-center gap-2 pl-7 sm:flex-nowrap">
+                    <select aria-label={`Rule ${i + 1} AND or OR`} className="field field-mono w-auto font-semibold" value={r.also.connector}
+                      onChange={e => updateAlso(i, { connector: e.target.value as Also['connector'] })}>
+                      <option>AND</option>
+                      <option>OR</option>
+                    </select>
+                    <select aria-label={`Rule ${i + 1} second variable`} className="field field-mono w-auto min-w-0" value={r.also.variable}
+                      onChange={e => updateAlso(i, { variable: e.target.value })}>
+                      {VARIABLES.map(v => <option key={v}>{v}</option>)}
+                    </select>
+                    <select aria-label={`Rule ${i + 1} second operator`} className="field field-mono w-auto" value={r.also.operator}
+                      onChange={e => updateAlso(i, { operator: e.target.value })}>
+                      {OPERATORS.map(op => <option key={op}>{op}</option>)}
+                    </select>
+                    <input aria-label={`Rule ${i + 1} second value`} type="number" className="field field-mono w-20" value={r.also.value}
+                      onChange={e => updateAlso(i, { value: parseInt(e.target.value, 10) || 0 })} />
+                    <button type="button" className="btn btn-quiet btn-sm" onClick={() => updateAlso(i, null)}>
+                      Remove condition
+                    </button>
+                  </div>
+                 ) : (
+                  <div className="pl-7">
+                    <button type="button" className="btn btn-quiet btn-sm -ml-3" onClick={() => updateAlso(i, {})}>
+                      Add AND / OR condition
+                    </button>
+                  </div>
+                 )}
                 </li>
               ))}
             </ol>
