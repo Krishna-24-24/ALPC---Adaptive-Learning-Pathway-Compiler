@@ -9,8 +9,8 @@ docker run -d --name alpc-api-smoke --network alpc-smoke -p 127.0.0.1:15000:1000
   -e JWT_SECRET=ci-only-not-a-production-secret-0123456789 \
   -e FRONTEND_URL=http://localhost:3000 \
   -e ML_SERVICE_URL=http://alpc-ml-smoke:10000 alpc-api
-curl --fail --retry 30 --retry-delay 2 --retry-connrefused http://127.0.0.1:18000/health
-curl --fail --retry 30 --retry-delay 2 --retry-connrefused http://127.0.0.1:15000/health
+curl --fail --retry 30 --retry-delay 2 --retry-all-errors --retry-max-time 90 --max-time 5 http://127.0.0.1:18000/health
+curl --fail --retry 30 --retry-delay 2 --retry-all-errors --retry-max-time 90 --max-time 5 http://127.0.0.1:15000/health
 curl --fail -sS http://127.0.0.1:15000/api/alpc/compile \
   -H 'Content-Type: application/json' \
   -d '{"source":"OUTCOME core; SET state = 62; IF state >= 50 GOTO core;"}' > /tmp/alpc-compile.json
