@@ -1,0 +1,7 @@
+OUTCOME low;
+OUTCOME high;
+SET a = 5;
+SET b = 90;
+SET state = 7;
+IF a > 100 OR b > 80 AND a < 10 GOTO high;
+IF a > 0 GOTO low;

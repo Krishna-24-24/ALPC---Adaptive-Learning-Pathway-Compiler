@@ -1,0 +1,111 @@
+# Runs on every push and pull request. The same commands work locally:
+#   make check / make test-asan   compiler fixtures and AST unit tests
+#   npm test                      backend suites (real alpc, lli and opt)
+#   npm run build:frontend        typecheck, lint and production build
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  compiler:
+    name: Compiler (Linux)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Flex, Bison and LLVM
+        run: sudo apt-get update && sudo apt-get install -y flex bison llvm-18-dev llvm-18 && echo "/usr/lib/llvm-18/bin" >> "$GITHUB_PATH"
+      - name: Build and run the fixtures
+        run: make check
+      - name: Sanitizer build and AST unit tests
+        run: make test-asan
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alpc-linux
+          path: alpc
+
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Flex, Bison and LLVM
+        run: sudo apt-get update && sudo apt-get install -y flex bison llvm-18-dev llvm-18 && echo "/usr/lib/llvm-18/bin" >> "$GITHUB_PATH"
+      - run: make
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci --prefix backend
+      - name: Integration, study and feature suites
+        run: npm test
+        env:
+          ALPC_BIN: ${{ github.workspace }}/alpc
+          LLI_BIN: lli
+          OPT_BIN: opt
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run lint
+      - run: npm run build
+
+  windows:
+    name: Compiler (Windows, alpc.exe)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            make flex bison diffutils python
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-llvm
+      - name: Build and run the fixtures
+        run: make check
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alpc-windows
+          path: alpc.exe
+
+  docker:
+    name: Deployment images
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API and compiler (includes compiler fixtures)
+        run: docker build -t alpc-api .
+      - name: Build ML service
+        run: docker build -t alpc-ml ml-service
+      - name: Smoke test both services
+        run: bash tests/deploy-smoke.sh
+      - name: Container logs on failure
+        if: failure()
+        run: |
+          docker logs alpc-api-smoke || true
+          docker logs alpc-ml-smoke || true
+          docker logs alpc-mongo-smoke || true
+      - name: Clean up
+        if: always()
+        run: |
+          docker rm -f alpc-api-smoke alpc-ml-smoke alpc-mongo-smoke || true
+          docker network rm alpc-smoke || true

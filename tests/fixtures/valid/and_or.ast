@@ -1,0 +1,10 @@
+Program binary_output=0
+  Outcome     line=2  name="remedial"
+  Outcome     line=3  name="core"
+  Outcome     line=4  name="advanced"
+  ProfileSet  line=6  name="performance" op="=" value=62
+  ProfileSet  line=7  name="mastery" op="=" value=35
+  ProfileSet  line=8  name="state" op="=" value=62
+  CondBranch  line=10  cond="(performance < 50 OR mastery < 30)" target="remedial"
+  CondBranch  line=11  cond="(performance >= 85 AND mastery >= 70)" target="advanced"
+  CondBranch  line=12  cond="((performance < 70 OR mastery < 40) AND performance >= 50)" target="core"

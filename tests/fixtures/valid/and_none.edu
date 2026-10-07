@@ -1,0 +1,5 @@
+OUTCOME only;
+SET x = 3;
+SET y = 4;
+SET state = 1;
+IF x == 3 AND y == 5 GOTO only;

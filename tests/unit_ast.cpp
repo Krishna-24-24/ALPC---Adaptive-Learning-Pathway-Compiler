@@ -59,7 +59,7 @@ int main() {
 
   // --- cast<> returns the derived pointer for a correct kind ---
   const CondBranch *cb = cast<CondBranch>(b.get());
-  CHECK(cb->rel == REL_LT && cb->target == "remedial" && cb->line() == 2);
+  CHECK(cb->simple() && cb->simple()->rel == REL_LT && cb->target == "remedial" && cb->line() == 2);
 
   // --- base accessors ---
   CHECK(p->kind() == NK_ProfileSet && p->line() == 1);
@@ -110,6 +110,33 @@ int main() {
   adj.stmts.insert(adj.stmts.begin() + 1,
                    std::make_unique<ProfileSet>(2, "state", OP_ASSIGN, 0));
   CHECK(check_program(adj) == 0);
+
+  // --- AND/OR: condition nodes have their own kinds and print grouped ---
+  auto cond = std::make_unique<Logical>(
+      4, LOGIC_OR, std::make_unique<Compare>(4, "a", REL_LT, 1),
+      std::make_unique<Logical>(4, LOGIC_AND, std::make_unique<Compare>(4, "b", REL_GT, 2),
+                                std::make_unique<Compare>(4, "c", REL_EQ, 3)));
+  CHECK(isa<Logical>(cond.get()) && !isa<Compare>(cond.get()) && !isa<CondBranch>(cond.get()));
+  int compares = 0;
+  std::string order;
+  for_each_compare(cond.get(), [&](const Compare &c) { ++compares; order += c.var; });
+  CHECK(compares == 3 && order == "abc");
+  CondBranch both(4, std::move(cond), "remedial");
+  CHECK(both.simple() == nullptr);
+  std::ostringstream cs;
+  both.print(cs);
+  CHECK(cs.str().find("cond=\"(a < 1 OR (b > 2 AND c == 3))\"") != std::string::npos);
+
+  // --- every variable in a compound condition must be set first ---
+  Program unset;
+  unset.stmts.push_back(std::make_unique<Outcome>(1, "remedial"));
+  unset.stmts.push_back(std::make_unique<ProfileSet>(2, "a", OP_ASSIGN, 0));
+  unset.stmts.push_back(std::make_unique<CondBranch>(
+      3,
+      std::make_unique<Logical>(3, LOGIC_AND, std::make_unique<Compare>(3, "a", REL_LT, 1),
+                                std::make_unique<Compare>(3, "z", REL_LT, 1)),
+      "remedial"));
+  CHECK(check_program(unset) == 1);  // only 'z'
 
   std::printf("unit_ast: %d checks passed\n", checks);
   return 0;

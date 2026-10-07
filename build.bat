@@ -5,20 +5,42 @@ echo ========================================
 echo  Building ALPC (Adaptive Learning Pathway Compiler)
 echo ========================================
 
-set "PATH=C:\Program Files\CodeBlocks\MinGW\bin;C:\Users\Krishna\AppData\Local\Microsoft\WinGet\Packages\WinFlexBison.win_flex_bison_Microsoft.Winget.Source_8wekyb3d8bbwe;%PATH%"
+rem Toolchain: MSYS2 (C:\msys64) if installed, else whatever is already on PATH
+rem (e.g. CodeBlocks MinGW + WinFlexBison). Override the root with MSYS2_ROOT.
+if not defined MSYS2_ROOT set "MSYS2_ROOT=C:\msys64"
+if exist "%MSYS2_ROOT%\mingw64\bin\g++.exe" set "PATH=%MSYS2_ROOT%\mingw64\bin;%MSYS2_ROOT%\usr\bin;%PATH%"
+
+rem Prefer WinFlexBison names, fall back to plain flex/bison (MSYS2).
+set "BISON=bison"
+where /q win_bison && set "BISON=win_bison"
+set "FLEX=flex"
+where /q win_flex && set "FLEX=win_flex"
+
+where /q g++ || (
+  echo g++ not found. Install MSYS2 and run: pacman -S mingw-w64-x86_64-gcc flex bison
+  exit /b 1
+)
+where /q %BISON% || (
+  echo bison not found. Install it: pacman -S bison  ^(MSYS2^)  or  winget install WinFlexBison.win_flex_bison
+  exit /b 1
+)
+where /q %FLEX% || (
+  echo flex not found. Install it: pacman -S flex  ^(MSYS2^)  or  winget install WinFlexBison.win_flex_bison
+  exit /b 1
+)
 
 if not exist obj mkdir obj
 if not exist obj\tmp mkdir obj\tmp
 
 echo [1/4] Running Bison on src\parser.y...
-win_bison -d -o obj\parser.tab.c src\parser.y
+%BISON% -d -o obj\parser.tab.c src\parser.y
 if %errorlevel% neq 0 (
   echo Bison failed!
   exit /b 1
 )
 
 echo [2/4] Running Flex on src\scanner.l...
-win_flex -o obj\lex.yy.c src\scanner.l
+%FLEX% -o obj\lex.yy.c src\scanner.l
 if %errorlevel% neq 0 (
   echo Flex failed!
   exit /b 1

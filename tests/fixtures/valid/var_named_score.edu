@@ -1,0 +1,6 @@
+# A Path-Lang variable named like one of the compiler's internal values.
+# Before internal names got an "alpc." prefix this redefined %score.
+OUTCOME pass;
+SET score = 5;
+SET state = 2;
+IF score > 3 GOTO pass;

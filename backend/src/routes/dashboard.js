@@ -1,9 +1,11 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const Mastery = require('../models/Mastery');
 const Attempt = require('../models/Attempt');
 const Recommendation = require('../models/Recommendation');
 const { authMiddleware } = require('../middleware/auth');
 const mlService = require('../services/mlService');
+const { dueForReview } = require('../services/review');
 
 const router = express.Router();
 
@@ -32,9 +34,16 @@ router.get('/dashboard', authMiddleware, async (req, res) => {
       updatedAt: r.updatedAt,
     }));
 
+    const last = await Attempt.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(req.user.id) } },
+      { $group: { _id: '$skill', at: { $max: '$timestamp' } } },
+    ]);
+    const review = dueForReview(masteryRecords, Object.fromEntries(last.map(l => [l._id, l.at])));
+
     res.json({
       skills,
       masteryMap,
+      review,
       weakestSkills: analytics.weakestSkills,
       learningPath: analytics.learningPath,
       nextTopic,
@@ -47,7 +56,7 @@ router.get('/dashboard', authMiddleware, async (req, res) => {
       recommendations,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 
@@ -63,7 +72,7 @@ router.get('/mastery', authMiddleware, async (req, res) => {
       })),
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 
@@ -92,7 +101,7 @@ router.get('/history', authMiddleware, async (req, res) => {
 
     res.json({ attempts: attempts.slice(0, 20), improvementOverTime: improvement });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 
@@ -110,7 +119,7 @@ router.get('/recommendations', authMiddleware, async (req, res) => {
     const recommendations = await mlService.getBatchRecommendations(masteryMap);
     res.json({ recommendations });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 

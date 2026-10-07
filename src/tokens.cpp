@@ -22,6 +22,10 @@ const char *alpc_token_name(int kind) {
     case SUB_ASSIGN: return "SUB_ASSIGN";
     case SEMI:       return "SEMI";
     case SEMI_B:     return "SEMI_B";
+    case AND:        return "AND";
+    case OR:         return "OR";
+    case LPAREN:     return "LPAREN";
+    case RPAREN:     return "RPAREN";
     default:         return "?";
   }
 }

@@ -1,4 +1,7 @@
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-pydantic==2.10.4
-python-dotenv==1.0.1
+# Minimum versions with prebuilt wheels for current Python (3.10 to 3.14).
+# Older pins such as pydantic==2.10.4 have no wheels for 3.13+ and try to compile
+# pydantic-core from Rust source.
+fastapi>=0.115.6
+uvicorn[standard]>=0.34.0
+pydantic>=2.11
+python-dotenv>=1.0.1

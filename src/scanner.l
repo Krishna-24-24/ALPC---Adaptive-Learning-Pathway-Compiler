@@ -37,6 +37,8 @@ static int alpc_col = 1;
 "IF"              { return IF; }
 "GOTO"            { return GOTO; }
 "OUTCOME"         { return OUTCOME; }
+"AND"             { return AND; }
+"OR"              { return OR; }
 
 [A-Za-z_][A-Za-z0-9_]*  { yylval.sval = strdup(yytext); return IDENT; }
 
@@ -65,6 +67,8 @@ static int alpc_col = 1;
 "+="              { return ADD_ASSIGN; }
 "-="              { return SUB_ASSIGN; }
 "="               { return ASSIGN; }
+"("               { return LPAREN; }
+")"               { return RPAREN; }
 
   /* Binary-output terminator "; b". If a letter/digit/_ follows the 'b' it is an
    * identifier, not the marker: keep only ';' and rescan from the 'b'. */

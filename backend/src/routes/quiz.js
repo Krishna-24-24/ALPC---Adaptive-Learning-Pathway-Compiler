@@ -7,6 +7,7 @@ const User = require('../models/User');
 const Recommendation = require('../models/Recommendation');
 const { authMiddleware } = require('../middleware/auth');
 const mlService = require('../services/mlService');
+const { present, answeredOnly } = require('../services/quizShuffle');
 
 const router = express.Router();
 
@@ -97,13 +98,7 @@ router.get('/diagnostic', authMiddleware, async (req, res) => {
       });
       if (q) {
         usedIds.add(q._id.toString());
-        selectedQuestions.push({
-          id: q._id,
-          skill: q.skill,
-          difficulty: q.difficulty,
-          text: q.text,
-          options: q.options,
-        });
+        selectedQuestions.push(present(q));
       }
     }
 
@@ -121,13 +116,7 @@ router.get('/diagnostic', authMiddleware, async (req, res) => {
       });
       if (q) {
         usedIds.add(q._id.toString());
-        selectedQuestions.push({
-          id: q._id,
-          skill: q.skill,
-          difficulty: q.difficulty,
-          text: q.text,
-          options: q.options,
-        });
+        selectedQuestions.push(present(q));
       }
     }
 
@@ -136,13 +125,7 @@ router.get('/diagnostic', authMiddleware, async (req, res) => {
       const q = await pickRandomQuestion({ usedIds: [...usedIds] });
       if (!q) break;
       usedIds.add(q._id.toString());
-      selectedQuestions.push({
-        id: q._id,
-        skill: q.skill,
-        difficulty: q.difficulty,
-        text: q.text,
-        options: q.options,
-      });
+      selectedQuestions.push(present(q));
     }
 
     // Shuffle the final question array so difficulty/skills are interspersed
@@ -150,16 +133,16 @@ router.get('/diagnostic', authMiddleware, async (req, res) => {
 
     res.json({ questions: finalQuestions });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 
 // POST /api/quiz/diagnostic/submit
 router.post('/diagnostic/submit', authMiddleware, async (req, res) => {
   try {
-    const { answers } = req.body;
-    if (!Array.isArray(answers) || answers.length === 0) {
-      return res.status(400).json({ error: 'Answers array is required' });
+    const answers = Array.isArray(req.body.answers) ? answeredOnly(req.body.answers) : [];
+    if (answers.length === 0) {
+      return res.status(400).json({ error: 'Answer at least one question before submitting.' });
     }
 
     const results = [];
@@ -195,13 +178,61 @@ router.post('/diagnostic/submit', authMiddleware, async (req, res) => {
       message: 'Diagnostic assessment completed',
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 
-// GET /api/quiz/adaptive
+const TOPIC_QUIZ_LENGTH = 5;
+
+/**
+ * Up to `count` questions on one topic, preferring `difficulty` and questions
+ * the student has not seen recently. Never fills in from other topics.
+ */
+async function topicQuestions(skill, difficulty, avoidIds, count) {
+  const avoid = avoidIds.map(id => new mongoose.Types.ObjectId(id));
+  const picked = [];
+  for (const match of [
+    { skill, difficulty, _id: { $nin: avoid } },
+    { skill, _id: { $nin: avoid } },
+    { skill },
+  ]) {
+    if (picked.length >= count) break;
+    const taken = picked.map(q => q._id);
+    const more = await Question.aggregate([
+      { $match: { ...match, _id: { $nin: [...(match._id?.$nin || []), ...taken] } } },
+      { $sample: { size: count - picked.length } },
+    ]);
+    picked.push(...more);
+  }
+  return picked;
+}
+
+// GET /api/quiz/adaptive            ten questions, weakest topics first
+// GET /api/quiz/adaptive?skill=X    five questions on topic X only
 router.get('/adaptive', authMiddleware, async (req, res) => {
   try {
+    const { skill } = req.query;
+    if (skill !== undefined) {
+      if (!ALL_SKILLS.includes(skill)) {
+        return res.status(404).json({ error: `There is no topic called "${skill}".` });
+      }
+      const [record, recent] = await Promise.all([
+        Mastery.findOne({ userId: req.user.id, skill }),
+        Attempt.find({ userId: req.user.id, skill }).sort({ timestamp: -1 }).limit(20),
+      ]);
+      const masteryScore = record ? record.masteryScore : 0.3;
+      let difficulty;
+      try {
+        difficulty = (await mlService.selectDifficulty(skill, masteryScore)).recommendedDifficulty || 'medium';
+      } catch (_e) {
+        difficulty = masteryScore < 0.4 ? 'easy' : masteryScore > 0.7 ? 'hard' : 'medium';
+      }
+      const avoidIds = [...new Set(recent.map(a => a.questionId.toString()))];
+      const qs = await topicQuestions(skill, difficulty, avoidIds, TOPIC_QUIZ_LENGTH);
+      const questions = qs.map(q => present(q, { targetMastery: masteryScore, recommendedDifficulty: difficulty }));
+      return res.json({ questions, count: questions.length, skill });
+    }
+
     // 1. Get user's recent question attempts to avoid repeating recently seen questions
     const recentAttempts = await Attempt.find({ userId: req.user.id })
       .sort({ timestamp: -1 })
@@ -240,15 +271,7 @@ router.get('/adaptive', authMiddleware, async (req, res) => {
 
       if (q) {
         usedIds.add(q._id.toString());
-        selectedQuestions.push({
-          id: q._id,
-          skill: q.skill,
-          difficulty: q.difficulty,
-          text: q.text,
-          options: q.options,
-          targetMastery: record.masteryScore,
-          recommendedDifficulty: difficulty,
-        });
+        selectedQuestions.push(present(q, { targetMastery: record.masteryScore, recommendedDifficulty: difficulty }));
       }
     }
 
@@ -263,15 +286,7 @@ router.get('/adaptive', authMiddleware, async (req, res) => {
         });
         if (q) {
           usedIds.add(q._id.toString());
-          selectedQuestions.push({
-            id: q._id,
-            skill: q.skill,
-            difficulty: q.difficulty,
-            text: q.text,
-            options: q.options,
-            targetMastery: record.masteryScore,
-            recommendedDifficulty: q.difficulty,
-          });
+          selectedQuestions.push(present(q, { targetMastery: record.masteryScore, recommendedDifficulty: q.difficulty }));
         }
       }
     }
@@ -284,13 +299,7 @@ router.get('/adaptive', authMiddleware, async (req, res) => {
       });
       if (!q) break;
       usedIds.add(q._id.toString());
-      selectedQuestions.push({
-        id: q._id,
-        skill: q.skill,
-        difficulty: q.difficulty,
-        text: q.text,
-        options: q.options,
-      });
+      selectedQuestions.push(present(q));
     }
 
     // Shuffle the final list so the quiz is dynamic and engaging
@@ -298,16 +307,16 @@ router.get('/adaptive', authMiddleware, async (req, res) => {
 
     res.json({ questions: finalQuestions, count: finalQuestions.length });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 
 // POST /api/quiz/adaptive/submit
 router.post('/adaptive/submit', authMiddleware, async (req, res) => {
   try {
-    const { answers } = req.body;
-    if (!Array.isArray(answers) || answers.length === 0) {
-      return res.status(400).json({ error: 'Answers array is required' });
+    const answers = Array.isArray(req.body.answers) ? answeredOnly(req.body.answers) : [];
+    if (answers.length === 0) {
+      return res.status(400).json({ error: 'Answer at least one question before submitting.' });
     }
 
     const results = [];
@@ -334,7 +343,10 @@ router.post('/adaptive/submit', authMiddleware, async (req, res) => {
         questionId: question._id,
         skill: question.skill,
         correct,
-        explanation: question.explanation,
+        question: question.text,
+        yourAnswer: question.options[item.selectedOption] ?? null,
+        correctAnswer: question.options[question.answer],
+        explanation: question.explanation || null,
         updatedMastery: mastery.masteryScore,
       });
     }
@@ -380,7 +392,7 @@ router.post('/adaptive/submit', authMiddleware, async (req, res) => {
       recommendations,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 
@@ -413,7 +425,7 @@ router.post('/answer', authMiddleware, async (req, res) => {
       updatedMastery: mastery.masteryScore,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 

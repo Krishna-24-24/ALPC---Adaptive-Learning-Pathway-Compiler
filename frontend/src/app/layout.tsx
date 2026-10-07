@@ -1,46 +1,37 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import '@fontsource/ibm-plex-sans/400.css';
+import '@fontsource/ibm-plex-sans/500.css';
+import '@fontsource/ibm-plex-sans/600.css';
+import '@fontsource/ibm-plex-mono/400.css';
+import '@fontsource/ibm-plex-mono/600.css';
+import '@fontsource/caveat/500.css';
 import { AppShell } from '@/components/layout/AppShell';
 import './globals.css';
 
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
-
 export const metadata: Metadata = {
-  title: 'ALPC — Adaptive Learning Pathway Compiler',
-  description: 'A unified platform combining LearnSmart AI adaptive learning with ALPC compiler technology. Path-Lang → Flex → Bison → AST → LLVM IR → Personalized Learning.',
-  keywords: ['adaptive learning', 'compiler', 'LLVM IR', 'Path-Lang', 'DSA', 'AI learning', 'ALPC'],
-  openGraph: {
-    title: 'ALPC — Adaptive Learning Pathway Compiler',
-    description: 'Compiler-powered adaptive learning platform',
-    type: 'website',
-  },
+  title: 'ALPC: Adaptive Learning Pathway Compiler',
+  description:
+    'Path-Lang programs describe how a student should progress. ALPC lexes, parses, checks and compiles them to LLVM IR, then runs them to pick the next learning step.',
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+// Runs before paint so the saved theme never flashes.
+const themeScript = `
+try {
+  var t = localStorage.getItem('ls-theme');
+  if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark');
+  }
+} catch (e) {}
+`;
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} min-h-screen antialiased`} style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              try {
-                var theme = localStorage.getItem('ls-theme');
-                if (theme === 'light') {
-                  document.documentElement.classList.add('light');
-                  document.body.classList.add('light');
-                }
-              } catch(e) {}
-            `,
-          }}
-        />
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body>
+        <a href="#main" className="skip-link">Skip to content</a>
         <AppShell>{children}</AppShell>
       </body>
     </html>

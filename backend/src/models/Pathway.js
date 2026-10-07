@@ -12,6 +12,16 @@ const pathwaySchema = new mongoose.Schema({
     variable: { type: String, required: true },
     operator: { type: String, enum: ['<', '>', '==', '>=', '<=', '!='], required: true },
     value: { type: Number, required: true },
+    // Optional second comparison joined with AND or OR.
+    also: {
+      type: new mongoose.Schema({
+        connector: { type: String, enum: ['AND', 'OR'], required: true },
+        variable: { type: String, required: true },
+        operator: { type: String, enum: ['<', '>', '==', '>=', '<=', '!='], required: true },
+        value: { type: Number, required: true },
+      }, { _id: false }),
+      default: undefined,
+    },
     outcome: { type: String, required: true },
   }],
   defaultPathLang: { type: String, default: '' },

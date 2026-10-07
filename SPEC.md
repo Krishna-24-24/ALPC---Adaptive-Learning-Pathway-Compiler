@@ -59,6 +59,8 @@ The `; b` on the final statement selects binary output for the whole program.
 | `IF` | `IF` | keyword |
 | `GOTO` | `GOTO` | keyword |
 | `OUTCOME` | `OUTCOME` | keyword |
+| `AND` `OR` | `AND` `OR` | condition connectives (keywords, so not identifiers) |
+| `LPAREN` `RPAREN` | `(` `)` | grouping inside a condition |
 | `IDENT` | `[A-Za-z_][A-Za-z0-9_]*` | matched after keywords |
 | `NUMBER` | `[0-9]+` | non-negative i32 literal |
 | `LT` `GT` `EQ` | `<` `>` `==` | relational operators |
@@ -89,10 +91,20 @@ outcome_stmt: OUTCOME IDENT term
 outcome_op  : ADD_ASSIGN | SUB_ASSIGN
 set_stmt    : SET IDENT set_op NUMBER term
 set_op      : ASSIGN | ADD_ASSIGN | SUB_ASSIGN
-branch_stmt : IF IDENT rel NUMBER GOTO IDENT term
+branch_stmt : IF cond GOTO IDENT term
+cond        : cond OR cond_and
+            | cond_and
+cond_and    : cond_and AND cond_atom
+            | cond_atom
+cond_atom   : IDENT rel NUMBER
+            | LPAREN cond RPAREN
 rel         : LT | GT | EQ | NE | LE | GE
 term        : SEMI | SEMI_B
 ```
+
+`AND` binds tighter than `OR`; both are left-associative. `a < 1 OR b > 2 AND c == 3`
+means `a < 1 OR (b > 2 AND c == 3)`. The two-level `cond`/`cond_and` rules give that
+precedence without `%left`, and the grammar stays conflict-free.
 
 Error recovery: `stmt : error term` — on a malformed statement, emit one diagnostic,
 skip to the next terminator, continue; exit non-zero. No crash (Floor F4).
@@ -111,8 +123,8 @@ Checked in one source-order pass over the AST after parsing, so the source order
    (`C` points at the `GOTO` target.)
 2. **Outcome uniqueness** — declaring the same outcome name twice:
    `line N: outcome 'X' is already declared`
-3. **Variable-before-use** **[D]** — the `IDENT` in an `IF` condition must have been
-   introduced by an earlier `SET IDENT = ...`:
+3. **Variable-before-use** **[D]** — every `IDENT` in an `IF` condition (each side of an
+   `AND`/`OR`) must have been introduced by an earlier `SET IDENT = ...`:
    `line N: 'X' is used in a condition before it is set`
 4. **Update-before-declare** **[D]** — `SET x += n` / `SET x -= n` requires an earlier
    `SET x = n`: `line N: 'X' is updated before it is set`
@@ -134,6 +146,11 @@ Any violation ⇒ compilation fails after parsing (non-zero exit), no IR emitted
   `performance`, …), i32, usable only in `IF` conditions. Updates to profile vars are
   allowed but do not affect `state`.
 - `IF v REL n GOTO L` — evaluate `v REL n`; if true, transfer control to outcome `L`.
+- `IF c1 AND c2 GOTO L` / `IF c1 OR c2 GOTO L` — short-circuit: `AND` skips `c2` when `c1`
+  is false, `OR` skips it when `c1` is true. Lowered as control flow, not as `and`/`or` on
+  `i1`: each comparison is its own `icmp` + `br`, and the right-hand side starts a block
+  named `and.rhs.N` or `or.rhs.N`. A single comparison produces exactly the IR it did
+  before `AND`/`OR` existed.
 - Reaching any `OUTCOME` (by GOTO or fall-through) **ends the pathway**. The
   Alignment Score is the value of `state` at that point.
 - **Outcome adjustment:** `OUTCOME L += n;` / `OUTCOME L -= n;` declares `L` with a
@@ -145,9 +162,23 @@ Any violation ⇒ compilation fails after parsing (non-zero exit), no IR emitted
 - If **any** statement in the program used the `; b` terminator, the program prints the
   final Alignment Score as a binary string (no leading zeros; `0` prints as `0`),
   followed by a newline. Otherwise it prints the score in decimal.
+- **Outcome line.** After the score the program prints a second line naming the outcome
+  that ended the pathway: `outcome L` when an `IF … GOTO L` was taken, `outcome none`
+  when every rule failed and control fell off the end. Callers read the decision from
+  this line; nothing re-evaluates the rules outside the compiled program.
+- Lowering: every `outcome.L` block and the fall-through path branch to one merge block,
+  where `%alpc.selected = phi i32 [-1, %<fallthrough>], [k, %outcome.L_k] …` records
+  which outcome (by declaration index `k`) was reached. After the score is printed,
+  `switch i32 %alpc.selected` jumps to `alpc.report.k`, which calls
+  `puts("outcome L_k")`, or to the default that prints `outcome none`. All names the
+  compiler introduces start with `alpc.`, so they never clash with a Path-Lang
+  variable (a program may `SET score = 1`).
+- `main` returns the score, so `lli` exits with the score modulo 256 (an exit status of
+  `84` is a score of 84, not a failure). Callers read the score from stdout and judge
+  success by the two printed lines, never by the exit status.
 - Worked example (2.1): profile `performance = 60`; `state` 0 → `+= 15` → 15;
-  `IF 60 < 70` true ⇒ GOTO `remedial`; pathway ends; `; b` present ⇒ prints `1111`.
-  (`15` = binary `1111`, matching the PRD.)
+  `IF 60 < 70` true ⇒ GOTO `remedial`; pathway ends; `; b` present ⇒ prints `1111`
+  then `outcome remedial`. (`15` = binary `1111`, matching the PRD.)
 
 ---
 
@@ -209,6 +240,7 @@ Diagnostics are carried in the object, not printed to stderr. Exit code as above
     {"kind": "Outcome", "line": 1, "col": 9, "name": "remedial", "adjust": 0},
     {"kind": "ProfileSet", "line": 3, "col": 5, "name": "performance", "op": "=", "value": 62},
     {"kind": "CondBranch", "line": 5, "col": 4, "var": "performance", "rel": ">=", "value": 80,
+     "cond": {"var": "performance", "rel": ">=", "value": 80, "line": 5, "col": 4},
      "target": "advanced", "targetCol": 27}]},
   "diagnostics": [],
   "ir": "; ModuleID = ..."
@@ -225,6 +257,9 @@ Diagnostics are carried in the object, not printed to stderr. Exit code as above
   `duplicate-outcome`, `reserved-name`, `use-before-set`, `update-before-set`,
   `adjust-without-state`.
 - `ir` is `null` unless `success`.
+- `CondBranch.cond` is the condition tree: a comparison `{var, rel, value, line, col}` or
+  `{op: "AND"|"OR", lhs, rhs}`. The flat `var`/`rel`/`value` fields are present only when
+  the condition is a single comparison.
 
 ---
 

@@ -1,65 +1,57 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Plus, Trash2, Play, Save, ChevronDown, ChevronUp, Code2, Wrench, Sparkles, CheckCircle2 } from 'lucide-react';
-import { api, type AlpcCompileResult, type AlpcPathway } from '@/lib/api';
+import { useCallback, useEffect, useState } from 'react';
+import { api, type AlpcCompileResult, type AlpcPathway, type PathwayRule } from '@/lib/api';
 import { PipelineVisualization } from '@/components/alpc/PipelineVisualization';
 import { OutcomeCard } from '@/components/alpc/OutcomeCard';
-import { PathLangEditor } from '@/components/alpc/PathLangEditor';
+import { highlightPathLang } from '@/lib/pathlang';
 
-interface OutcomeEntry {
-  name: string;
-  adjustment: number;
+interface OutcomeEntry { name: string; adjustment: number }
+type RuleEntry = PathwayRule;
+type Also = NonNullable<RuleEntry['also']>;
+
+function condition(r: RuleEntry) {
+  const first = `${r.variable} ${r.operator} ${r.value}`;
+  return r.also ? `${first} ${r.also.connector} ${r.also.variable} ${r.also.operator} ${r.also.value}` : first;
 }
 
-interface RuleEntry {
-  variable: string;
-  operator: string;
-  value: number;
-  outcome: string;
-}
-
-const OPERATORS = ['<', '>', '==', '>=', '<=', '!='];
+const OPERATORS = ['<', '>', '==', '!=', '<=', '>='];
 const VARIABLES = ['performance', 'mastery', 'attempts', 'completion_rate'];
 
-function generatePathLangPreview(
-  outcomes: OutcomeEntry[],
-  variables: Record<string, number>,
-  rules: RuleEntry[]
-): string {
+function generatePathLang(outcomes: OutcomeEntry[], variables: Record<string, number>, rules: RuleEntry[]): string {
   const lines: string[] = [];
-
-  // Backward Design: OUTCOME statements must come first!
+  // Backward Design: every OUTCOME is emitted before any rule that targets it.
   for (const o of outcomes) {
-    if (!o.name.trim()) continue;
-    if (o.adjustment > 0) lines.push(`OUTCOME ${o.name.trim()} += ${o.adjustment};`);
-    else if (o.adjustment < 0) lines.push(`OUTCOME ${o.name.trim()} -= ${Math.abs(o.adjustment)};`);
-    else lines.push(`OUTCOME ${o.name.trim()};`);
+    const name = o.name.trim();
+    if (!name) continue;
+    if (o.adjustment > 0) lines.push(`OUTCOME ${name} += ${o.adjustment};`);
+    else if (o.adjustment < 0) lines.push(`OUTCOME ${name} -= ${Math.abs(o.adjustment)};`);
+    else lines.push(`OUTCOME ${name};`);
   }
-
   lines.push('');
-
-  for (const [k, v] of Object.entries(variables)) {
-    if (k !== 'state') lines.push(`SET ${k} = ${Math.round(v)};`);
-  }
-  lines.push('SET state = 0;');
-
-  lines.push('');
-
+  for (const [k, v] of Object.entries(variables)) lines.push(`SET ${k} = ${Math.round(v)};`);
+  lines.push('SET state = 0;', '');
   for (const r of rules) {
-    if (r.variable && r.outcome.trim()) {
-      lines.push(`IF ${r.variable} ${r.operator} ${r.value} GOTO ${r.outcome.trim()};`);
-    }
+    if (r.variable && r.outcome.trim()) lines.push(`IF ${condition(r)} GOTO ${r.outcome.trim()};`);
   }
-
   return lines.join('\n');
 }
 
+function Slider({ id, label, value, min, max, onChange }: { id: string; label: string; value: number; min: number; max: number; onChange: (v: number) => void }) {
+  return (
+    <div>
+      <label htmlFor={id} className="label flex justify-between">
+        <span>{label}</span><span className="t-num font-normal">{value}</span>
+      </label>
+      <input id={id} type="range" min={min} max={max} value={value} onChange={e => onChange(Number(e.target.value))} />
+    </div>
+  );
+}
+
 export default function PathwayBuilder() {
-  const [name, setName] = useState('Data Structures Mastery');
+  const [name, setName] = useState('Trees mastery');
   const [topic, setTopic] = useState('Trees');
-  const [description, setDescription] = useState('Adaptive compiler pathway for tree data structures');
+  const [description, setDescription] = useState('Sends students to one of four levels based on their Trees quiz.');
   const [outcomes, setOutcomes] = useState<OutcomeEntry[]>([
     { name: 'remedial', adjustment: 0 },
     { name: 'practice', adjustment: 0 },
@@ -67,392 +59,267 @@ export default function PathwayBuilder() {
     { name: 'advanced', adjustment: 0 },
   ]);
   const [rules, setRules] = useState<RuleEntry[]>([
-    { variable: 'performance', operator: '<', value: 50, outcome: 'remedial' },
+    { variable: 'performance', operator: '<', value: 50, outcome: 'remedial', also: { connector: 'OR', variable: 'mastery', operator: '<', value: 30 } },
     { variable: 'performance', operator: '<', value: 70, outcome: 'practice' },
     { variable: 'performance', operator: '<', value: 85, outcome: 'core' },
     { variable: 'performance', operator: '>=', value: 85, outcome: 'advanced' },
   ]);
 
-  // Demo Student Simulation state (PRD Section 22 & Section 32 Demo Scenario)
-  const [simPerformance, setSimPerformance] = useState(62);
-  const [simMastery, setSimMastery] = useState(58);
-  const [simAttempts, setSimAttempts] = useState(2);
+  const [perf, setPerf] = useState(62);
+  const [mastery, setMastery] = useState(58);
+  const [attempts, setAttempts] = useState(2);
   const [simResult, setSimResult] = useState<AlpcCompileResult | null>(null);
-  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulating, setSimulating] = useState(false);
   const [simError, setSimError] = useState<string | null>(null);
 
-  // Persistence
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [savedPathways, setSavedPathways] = useState<AlpcPathway[]>([]);
-  const [showPreview, setShowPreview] = useState(true);
+  const [saved, setSaved] = useState<AlpcPathway[] | null>(null);
 
-  const previewSource = generatePathLangPreview(
-    outcomes,
-    { performance: simPerformance, mastery: simMastery, attempts: simAttempts },
-    rules
-  );
+  const source = generatePathLang(outcomes, { performance: perf, mastery, attempts }, rules);
 
   useEffect(() => {
-    api.getPathways()
-      .then(r => setSavedPathways(r.pathways || []))
-      .catch(() => {});
+    api.getPathways().then(r => setSaved(r.pathways || [])).catch(() => setSaved([]));
   }, []);
 
-  const addOutcome = () => setOutcomes(prev => [...prev, { name: '', adjustment: 0 }]);
-  const removeOutcome = (i: number) => setOutcomes(prev => prev.filter((_, idx) => idx !== i));
   const updateOutcome = (i: number, patch: Partial<OutcomeEntry>) =>
-    setOutcomes(prev => prev.map((o, idx) => (idx === i ? { ...o, ...patch } : o)));
-
-  const addRule = () =>
-    setRules(prev => [
-      ...prev,
-      { variable: 'performance', operator: '<', value: 50, outcome: outcomes[0]?.name || '' },
-    ]);
-  const removeRule = (i: number) => setRules(prev => prev.filter((_, idx) => idx !== i));
+    setOutcomes(prev => prev.map((o, k) => (k === i ? { ...o, ...patch } : o)));
   const updateRule = (i: number, patch: Partial<RuleEntry>) =>
-    setRules(prev => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+    setRules(prev => prev.map((r, k) => (k === i ? { ...r, ...patch } : r)));
+  const updateAlso = (i: number, patch: Partial<Also> | null) =>
+    setRules(prev => prev.map((r, k) => {
+      if (k !== i) return r;
+      if (patch === null) { const { also: _drop, ...rest } = r; void _drop; return rest; }
+      return { ...r, also: { connector: 'AND', variable: 'mastery', operator: '<', value: 40, ...r.also, ...patch } };
+    }));
 
   const simulate = useCallback(async () => {
-    setIsSimulating(true);
+    setSimulating(true);
     setSimError(null);
-    setSimResult(null);
     try {
-      const res = await api.compilePathLang(previewSource);
-      setSimResult(res);
+      setSimResult(await api.compilePathLang(source));
     } catch (err) {
-      setSimError(err instanceof Error ? err.message : 'Simulation compile failed');
+      setSimResult(null);
+      setSimError(err instanceof Error ? err.message : 'The program could not be compiled.');
     } finally {
-      setIsSimulating(false);
+      setSimulating(false);
     }
-  }, [previewSource]);
+  }, [source]);
 
   const save = useCallback(async () => {
     setSaving(true);
     setSaveError(null);
     try {
       await api.createPathway({ name, topic, description, outcomes, rules });
-      setSaved(true);
+      setSavedAt(new Date().toLocaleTimeString());
       const r = await api.getPathways();
-      setSavedPathways(r.pathways || []);
-      setTimeout(() => setSaved(false), 3000);
+      setSaved(r.pathways || []);
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save pathway');
+      setSaveError(err instanceof Error ? err.message : 'The pathway was not saved.');
     } finally {
       setSaving(false);
     }
   }, [name, topic, description, outcomes, rules]);
 
-  return (
-    <div className="max-w-7xl mx-auto px-5 py-8">
-      {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/15 border border-indigo-500/20">
-            <Wrench className="h-5 w-5 text-indigo-400" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-[var(--text-primary)]">Adaptive Pathway Builder</h1>
-            <p className="text-sm text-[var(--text-muted)]">
-              Visual Rules &rarr; Path-Lang Code Generation &rarr; ALPC Compilation Pipeline
-            </p>
-          </div>
-        </div>
-      </motion.div>
+  const outcomeNames = outcomes.map(o => o.name.trim()).filter(Boolean);
 
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-        {/* Left: Builder (3/5) */}
-        <div className="xl:col-span-3 space-y-5">
-          {/* Metadata */}
-          <div className="card p-5">
-            <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Pathway Metadata</h2>
-            <div className="grid grid-cols-2 gap-3 mb-3">
+  return (
+    <div className="mx-auto max-w-[76rem] px-4 py-8 sm:px-6">
+      <header className="pb-6">
+        <h1 className="text-[1.75rem]">Pathway builder</h1>
+        <p className="mt-1 prose-measure text-[0.9375rem] t-graphite">
+          Define outcomes and rules with the form. The builder writes the Path-Lang program for you, and you can test
+          it against a sample student before saving.
+        </p>
+      </header>
+
+      <div className="grid gap-10 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-10">
+          <section aria-labelledby="details-h" className="space-y-4">
+            <h2 id="details-h" className="text-lg">Details</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="text-xs text-[var(--text-muted)] mb-1 block">Pathway Name</label>
-                <input
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  className="w-full bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-indigo-500/50"
-                />
+                <label htmlFor="pw-name" className="label">Name</label>
+                <input id="pw-name" className="field" value={name} onChange={e => setName(e.target.value)} />
               </div>
               <div>
-                <label className="text-xs text-[var(--text-muted)] mb-1 block">Target Course / Topic</label>
-                <input
-                  value={topic}
-                  onChange={e => setTopic(e.target.value)}
-                  className="w-full bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-indigo-500/50"
-                />
+                <label htmlFor="pw-topic" className="label">Topic</label>
+                <input id="pw-topic" className="field" value={topic} onChange={e => setTopic(e.target.value)} />
               </div>
             </div>
             <div>
-              <label className="text-xs text-[var(--text-muted)] mb-1 block">Description</label>
-              <input
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="Optional description"
-                className="w-full bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-indigo-500/50"
-              />
+              <label htmlFor="pw-desc" className="label">Description</label>
+              <input id="pw-desc" className="field" value={description} onChange={e => setDescription(e.target.value)} />
             </div>
-          </div>
+          </section>
 
-          {/* Outcomes */}
-          <div className="card p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-sm font-semibold text-[var(--text-primary)]">1. Learning Outcomes</h2>
-                <p className="text-[11px] text-[var(--text-muted)]">Backward Design: Declared before conditional branches</p>
-              </div>
-              <button
-                onClick={addOutcome}
-                className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
-              >
-                <Plus className="h-3.5 w-3.5" /> Add Outcome
-              </button>
+          <section aria-labelledby="outcomes-h" className="space-y-3">
+            <div>
+              <h2 id="outcomes-h" className="text-lg">Outcomes</h2>
+              <p className="mt-1 text-sm t-graphite">
+                Outcomes are written first because a rule can only jump to an outcome declared above it. The score
+                adjustment is added to the alignment score when a student lands there.
+              </p>
             </div>
-            <div className="space-y-2">
-              {outcomes.map((o, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-violet-500/15 text-[10px] font-bold text-violet-400">
-                    {i + 1}
-                  </div>
-                  <input
-                    value={o.name}
-                    onChange={e => updateOutcome(i, { name: e.target.value })}
-                    placeholder="outcome_name"
-                    className="flex-1 bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-lg px-3 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-violet-500/50 font-mono"
-                  />
-                  <input
-                    type="number"
-                    value={o.adjustment}
-                    onChange={e => updateOutcome(i, { adjustment: parseInt(e.target.value, 10) || 0 })}
-                    placeholder="±adj"
-                    title="Score delta adjustment on outcome selection"
-                    className="w-24 bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-lg px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-violet-500/50 text-center font-mono"
-                  />
-                  <button
-                    onClick={() => removeOutcome(i)}
-                    className="text-white/30 hover:text-rose-400 transition-colors p-1 cursor-pointer"
-                    aria-label={`Remove outcome ${o.name || i + 1}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Rules */}
-          <div className="card p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-sm font-semibold text-[var(--text-primary)]">2. Adaptive Decision Rules</h2>
-                <p className="text-[11px] text-[var(--text-muted)]">Evaluated in order &rarr; IF condition GOTO outcome</p>
-              </div>
-              <button
-                onClick={addRule}
-                className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
-              >
-                <Plus className="h-3.5 w-3.5" /> Add Rule
-              </button>
-            </div>
-            <div className="space-y-2">
-              {rules.map((r, i) => (
-                <div key={i} className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                  <span className="text-xs text-indigo-400 font-mono font-bold w-6 flex-shrink-0">IF</span>
-                  <select
-                    value={r.variable}
-                    onChange={e => updateRule(i, { variable: e.target.value })}
-                    className="bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-lg px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-indigo-500/50"
-                  >
-                    {VARIABLES.map(v => (
-                      <option key={v} value={v}>{v}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={r.operator}
-                    onChange={e => updateRule(i, { operator: e.target.value })}
-                    className="bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-lg px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-indigo-500/50 font-mono font-bold"
-                  >
-                    {OPERATORS.map(op => (
-                      <option key={op} value={op}>{op}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    value={r.value}
-                    onChange={e => updateRule(i, { value: parseInt(e.target.value, 10) || 0 })}
-                    className="w-20 bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-lg px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-indigo-500/50 text-center font-mono"
-                  />
-                  <span className="text-xs text-amber-400 font-mono font-bold flex-shrink-0">&rarr; GOTO</span>
-                  <select
-                    value={r.outcome}
-                    onChange={e => updateRule(i, { outcome: e.target.value })}
-                    className="flex-1 min-w-[120px] bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-lg px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-indigo-500/50 font-mono"
-                  >
-                    <option value="">Select outcome...</option>
-                    {outcomes.map(o => (
-                      <option key={o.name} value={o.name}>{o.name}</option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => removeRule(i)}
-                    className="text-white/30 hover:text-rose-400 transition-colors p-1 cursor-pointer"
-                    aria-label={`Remove rule ${i + 1}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Generated Path-Lang Source */}
-          <div className="card p-5">
-            <button
-              onClick={() => setShowPreview(!showPreview)}
-              className="flex items-center justify-between w-full mb-2 cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <Code2 className="h-4 w-4 text-indigo-400" />
-                <h2 className="text-sm font-semibold text-[var(--text-primary)]">Generated Path-Lang Program</h2>
-              </div>
-              <span className="text-white/40">{showPreview ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</span>
-            </button>
-            {showPreview && (
-              <div className="mt-3">
-                <PathLangEditor value={previewSource} onChange={() => {}} readOnly minRows={8} />
-              </div>
-            )}
-          </div>
-
-          {/* Action Row */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={save}
-              disabled={saving}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-50 cursor-pointer shadow-lg shadow-indigo-600/20"
-            >
-              <Save className="h-4 w-4" />
-              {saving ? 'Saving...' : saved ? 'Pathway Saved!' : 'Save Pathway'}
-            </button>
-          </div>
-          {saveError && <p className="text-xs text-rose-400">{saveError}</p>}
-        </div>
-
-        {/* Right: Student Simulation (2/5) */}
-        <div className="xl:col-span-2 space-y-5">
-          {/* Student Simulation controls (PRD Section 22) */}
-          <div className="card p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="h-4 w-4 text-indigo-400" />
-              <h2 className="text-sm font-semibold text-[var(--text-primary)]">Student Simulation Mode</h2>
-            </div>
-            <p className="text-xs text-[var(--text-muted)] mb-4 leading-relaxed">
-              Feed student metrics into the pathway generator, compile through ALPC, and observe the decision trace in real time.
-            </p>
-
-            <div className="space-y-4 mb-5">
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-[var(--text-secondary)]">Student Performance</span>
-                  <span className="font-bold text-indigo-300 font-mono">{simPerformance}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={simPerformance}
-                  onChange={e => setSimPerformance(parseInt(e.target.value, 10))}
-                  className="w-full accent-indigo-500 cursor-pointer"
-                />
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-[var(--text-secondary)]">Topic Mastery</span>
-                  <span className="font-bold text-indigo-300 font-mono">{simMastery}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={simMastery}
-                  onChange={e => setSimMastery(parseInt(e.target.value, 10))}
-                  className="w-full accent-indigo-500 cursor-pointer"
-                />
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-[var(--text-secondary)]">Assessment Attempts</span>
-                  <span className="font-bold text-indigo-300 font-mono">{simAttempts}</span>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="10"
-                  value={simAttempts}
-                  onChange={e => setSimAttempts(parseInt(e.target.value, 10))}
-                  className="w-full accent-indigo-500 cursor-pointer"
-                />
-              </div>
-            </div>
-
-            <button
-              onClick={simulate}
-              disabled={isSimulating}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-50 cursor-pointer shadow-lg shadow-indigo-600/20"
-            >
-              <Play className="h-4 w-4" />
-              {isSimulating ? 'Compiling Pathway...' : 'Run Adaptive Pathway'}
-            </button>
-          </div>
-
-          {/* Simulation Output */}
-          {simResult && (
-            <div className="space-y-4">
-              <div className="card p-4">
-                <p className="text-xs text-white/40 uppercase tracking-wide font-medium mb-3">Compiler Execution Pipeline</p>
-                <PipelineVisualization stages={simResult.stages} isCompiling={isSimulating} />
-              </div>
-
-              <OutcomeCard result={simResult} />
-            </div>
-          )}
-
-          {simError && (
-            <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 p-3.5">
-              <p className="text-xs text-rose-300 font-mono">{simError}</p>
-            </div>
-          )}
-
-          {/* Saved Pathways in DB */}
-          {savedPathways.length > 0 && (
-            <div className="card p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                <h2 className="text-sm font-semibold text-[var(--text-primary)]">Configured Pathways ({savedPathways.length})</h2>
-              </div>
-              <div className="space-y-2">
-                {savedPathways.slice(0, 5).map(p => (
-                  <div
-                    key={p._id}
-                    className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-3 text-xs"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="font-semibold text-[var(--text-primary)]">{p.name}</p>
-                      <span className="text-[10px] text-indigo-300 font-mono">{p.topic}</span>
-                    </div>
-                    <p className="text-[11px] text-[var(--text-muted)]">
-                      {p.outcomes?.length || 0} outcomes &bull; {p.rules?.length || 0} decision rules
-                    </p>
-                  </div>
+            <table className="table">
+              <thead><tr><th>Name</th><th className="w-36">Score adjustment</th><th className="w-20"><span className="sr-only">Remove</span></th></tr></thead>
+              <tbody>
+                {outcomes.map((o, i) => (
+                  <tr key={i}>
+                    <td>
+                      <input aria-label={`Outcome ${i + 1} name`} className="field field-mono" placeholder="outcome_name"
+                        value={o.name} onChange={e => updateOutcome(i, { name: e.target.value })} />
+                    </td>
+                    <td>
+                      <input aria-label={`Outcome ${i + 1} score adjustment`} type="number" className="field field-mono"
+                        value={o.adjustment} onChange={e => updateOutcome(i, { adjustment: parseInt(e.target.value, 10) || 0 })} />
+                    </td>
+                    <td>
+                      <button type="button" className="btn btn-quiet btn-sm" onClick={() => setOutcomes(prev => prev.filter((_, k) => k !== i))}>
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
                 ))}
-              </div>
+              </tbody>
+            </table>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setOutcomes(p => [...p, { name: '', adjustment: 0 }])}>
+              Add outcome
+            </button>
+          </section>
+
+          <section aria-labelledby="rules-h" className="space-y-3">
+            <div>
+              <h2 id="rules-h" className="text-lg">Rules</h2>
+              <p className="mt-1 text-sm t-graphite">
+                Checked from top to bottom. The first rule that holds decides the outcome. A rule can have a second
+                condition joined with AND (both must hold) or OR (either is enough).
+              </p>
             </div>
-          )}
+            <ol className="space-y-2">
+              {rules.map((r, i) => (
+                <li key={i} className="space-y-2 text-sm">
+                 <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+                  <span className="w-5 text-right t-faint t-num">{i + 1}</span>
+                  <span className="font-[family-name:var(--font-mono)] font-semibold">IF</span>
+                  <select aria-label={`Rule ${i + 1} variable`} className="field field-mono w-auto min-w-0" value={r.variable}
+                    onChange={e => updateRule(i, { variable: e.target.value })}>
+                    {VARIABLES.map(v => <option key={v}>{v}</option>)}
+                  </select>
+                  <select aria-label={`Rule ${i + 1} operator`} className="field field-mono w-auto" value={r.operator}
+                    onChange={e => updateRule(i, { operator: e.target.value })}>
+                    {OPERATORS.map(op => <option key={op}>{op}</option>)}
+                  </select>
+                  <input aria-label={`Rule ${i + 1} value`} type="number" className="field field-mono w-20" value={r.value}
+                    onChange={e => updateRule(i, { value: parseInt(e.target.value, 10) || 0 })} />
+                  <span className="font-[family-name:var(--font-mono)] font-semibold">GOTO</span>
+                  <select aria-label={`Rule ${i + 1} outcome`} className="field field-mono min-w-[7rem] flex-1" value={r.outcome}
+                    onChange={e => updateRule(i, { outcome: e.target.value })}>
+                    <option value="">choose outcome</option>
+                    {outcomeNames.map(n => <option key={n}>{n}</option>)}
+                  </select>
+                  <button type="button" className="btn btn-quiet btn-sm" onClick={() => setRules(prev => prev.filter((_, k) => k !== i))}>
+                    Remove
+                  </button>
+                 </div>
+                 {r.also ? (
+                  <div className="flex flex-wrap items-center gap-2 pl-7 sm:flex-nowrap">
+                    <select aria-label={`Rule ${i + 1} AND or OR`} className="field field-mono w-auto font-semibold" value={r.also.connector}
+                      onChange={e => updateAlso(i, { connector: e.target.value as Also['connector'] })}>
+                      <option>AND</option>
+                      <option>OR</option>
+                    </select>
+                    <select aria-label={`Rule ${i + 1} second variable`} className="field field-mono w-auto min-w-0" value={r.also.variable}
+                      onChange={e => updateAlso(i, { variable: e.target.value })}>
+                      {VARIABLES.map(v => <option key={v}>{v}</option>)}
+                    </select>
+                    <select aria-label={`Rule ${i + 1} second operator`} className="field field-mono w-auto" value={r.also.operator}
+                      onChange={e => updateAlso(i, { operator: e.target.value })}>
+                      {OPERATORS.map(op => <option key={op}>{op}</option>)}
+                    </select>
+                    <input aria-label={`Rule ${i + 1} second value`} type="number" className="field field-mono w-20" value={r.also.value}
+                      onChange={e => updateAlso(i, { value: parseInt(e.target.value, 10) || 0 })} />
+                    <button type="button" className="btn btn-quiet btn-sm" onClick={() => updateAlso(i, null)}>
+                      Remove condition
+                    </button>
+                  </div>
+                 ) : (
+                  <div className="pl-7">
+                    <button type="button" className="btn btn-quiet btn-sm -ml-3" onClick={() => updateAlso(i, {})}>
+                      Add AND / OR condition
+                    </button>
+                  </div>
+                 )}
+                </li>
+              ))}
+            </ol>
+            <button type="button" className="btn btn-outline btn-sm"
+              onClick={() => setRules(p => [...p, { variable: 'performance', operator: '<', value: 50, outcome: outcomeNames[0] || '' }])}>
+              Add rule
+            </button>
+          </section>
+
+          <section aria-labelledby="program-h" className="space-y-3">
+            <h2 id="program-h" className="text-lg">Generated program</h2>
+            <div className="listing"><pre>{source.split('\n').map((l, i) => <div key={i}>{l ? highlightPathLang(l) : ' '}</div>)}</pre></div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="button" onClick={save} disabled={saving} className="btn btn-primary">
+                {saving ? 'Saving…' : 'Save pathway'}
+              </button>
+              {savedAt && !saveError && <p className="text-sm t-pass" role="status">Saved at {savedAt}.</p>}
+              {saveError && <p className="text-sm t-mark" role="alert">{saveError}</p>}
+            </div>
+          </section>
         </div>
+
+        <aside className="min-w-0 space-y-8">
+          <section aria-labelledby="sim-h" className="panel space-y-5 p-5">
+            <div>
+              <h2 id="sim-h" className="text-lg">Test with a sample student</h2>
+              <p className="mt-1 text-sm t-graphite">These values become the SET lines of the program above.</p>
+            </div>
+            <Slider id="sim-perf" label="Performance" value={perf} min={0} max={100} onChange={setPerf} />
+            <Slider id="sim-mastery" label="Mastery" value={mastery} min={0} max={100} onChange={setMastery} />
+            <Slider id="sim-attempts" label="Attempts" value={attempts} min={1} max={10} onChange={setAttempts} />
+            <button type="button" onClick={simulate} disabled={simulating} className="btn btn-primary w-full">
+              {simulating ? 'Compiling…' : 'Compile and run'}
+            </button>
+          </section>
+
+          {simulating && !simResult && (
+            <div className="space-y-2" aria-label="Compiling"><div className="skel h-7 w-40" /><div className="skel h-4 w-56" /></div>
+          )}
+          {simError && <p className="notice notice-error" role="alert">{simError}</p>}
+          {simResult && (
+            <section aria-label="Result" className="space-y-5">
+              <OutcomeCard result={simResult} />
+              <PipelineVisualization stages={simResult.stages} />
+            </section>
+          )}
+
+          <section aria-labelledby="saved-h" className="space-y-3">
+            <h2 id="saved-h" className="text-lg">Saved pathways</h2>
+            {saved === null ? (
+              <div className="space-y-2"><div className="skel h-4 w-full" /><div className="skel h-4 w-4/5" /></div>
+            ) : saved.length === 0 ? (
+              <p className="text-sm t-graphite">None saved yet.</p>
+            ) : (
+              <table className="table">
+                <thead><tr><th>Name</th><th>Topic</th><th className="text-right">Rules</th></tr></thead>
+                <tbody>
+                  {saved.slice(0, 8).map(p => (
+                    <tr key={p._id}>
+                      <td className="font-medium">{p.name}</td>
+                      <td className="t-graphite">{p.topic}</td>
+                      <td className="text-right t-num">{p.rules?.length || 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+        </aside>
       </div>
     </div>
   );

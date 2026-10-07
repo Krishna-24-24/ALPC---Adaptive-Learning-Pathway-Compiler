@@ -17,6 +17,10 @@ void yyerror(const char *msg);
 extern alpc::Program *g_program;  // set by the driver before yyparse()
 %}
 
+%code requires {
+namespace alpc { class ASTNode; }
+}
+
 %locations
 %define parse.error detailed   /* report unexpected + expected tokens (>= 3.6) */
 %define parse.lac full         /* make those reports accurate (manual, "LAC") */
@@ -24,19 +28,23 @@ extern alpc::Program *g_program;  // set by the driver before yyparse()
 %union {
   int   ival;
   char *sval;
+  alpc::ASTNode *node;  /* condition subtree, owned by the parser until wrapped */
 }
 
 %token SET IF GOTO OUTCOME
 %token <sval> IDENT
 %token <ival> NUMBER
 %token LT GT EQ NE LE GE ASSIGN ADD_ASSIGN SUB_ASSIGN SEMI SEMI_B
+%token AND OR LPAREN RPAREN
 
 %type <ival> set_op rel outcome_op
+%type <node> cond cond_and cond_atom
 
 /* IDENT carries a strdup'd string; free it if error recovery discards the token
  * (Bison manual, "Destructor Decl"). Rule actions free the ones they consume;
  * the destructor only runs for tokens the parser drops before a reduce. */
 %destructor { free($$); } <sval>
+%destructor { delete $$; } <node>
 
 %%
 
@@ -92,12 +100,38 @@ set_op
   ;
 
 branch_stmt
-  : IF IDENT rel NUMBER GOTO IDENT term
+  : IF cond GOTO IDENT term
       { g_program->stmts.push_back(
             std::make_unique<alpc::CondBranch>(
-                @2.first_line, $2, static_cast<alpc::RelOp>($3), $4, $6,
-                @2.first_column, @6.first_column));
-        free($2); free($6); }
+                @2.first_line, std::unique_ptr<alpc::ASTNode>($2), $4,
+                $2->col(), @4.first_column));
+        free($4); }
+  ;
+
+/* OR has the lowest precedence, then AND; both are left-associative.
+ * Written as two levels so the grammar stays conflict-free without %left. */
+cond
+  : cond OR cond_and
+      { $$ = new alpc::Logical(@1.first_line, alpc::LOGIC_OR,
+                               std::unique_ptr<alpc::ASTNode>($1),
+                               std::unique_ptr<alpc::ASTNode>($3), $1->col()); }
+  | cond_and
+  ;
+
+cond_and
+  : cond_and AND cond_atom
+      { $$ = new alpc::Logical(@1.first_line, alpc::LOGIC_AND,
+                               std::unique_ptr<alpc::ASTNode>($1),
+                               std::unique_ptr<alpc::ASTNode>($3), $1->col()); }
+  | cond_atom
+  ;
+
+cond_atom
+  : IDENT rel NUMBER
+      { $$ = new alpc::Compare(@1.first_line, $1, static_cast<alpc::RelOp>($2), $3,
+                               @1.first_column);
+        free($1); }
+  | LPAREN cond RPAREN  { $$ = $2; }
   ;
 
 rel

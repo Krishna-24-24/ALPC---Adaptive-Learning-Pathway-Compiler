@@ -1,13 +1,17 @@
 'use strict';
 
 const express  = require('express');
-const Mastery  = require('../models/Mastery');
 const Pathway  = require('../models/Pathway');
 const CompilerDecision = require('../models/CompilerDecision');
 const { authMiddleware } = require('../middleware/auth');
 const alpcRunner         = require('../services/alpcRunner');
-const { parseCompilerResult } = require('../services/resultParser');
 const { generateForStudent, generatePathLang, validate } = require('../services/pathwayGenerator');
+const { decide } = require('../services/decide');
+const { rateLimit } = require('../middleware/rateLimit');
+
+// Public routes that run the compiler: limit each client.
+const compileLimit = rateLimit({ windowMs: 60_000, max: Number(process.env.COMPILE_PER_MINUTE) || 30, name: 'compile' });
+const checkLimit   = rateLimit({ windowMs: 60_000, max: Number(process.env.CHECK_PER_MINUTE) || 150, name: 'check' });
 
 const router = express.Router();
 
@@ -18,10 +22,10 @@ const OUTCOME_CONTENT = {
     label: 'Remedial Path',
     tier: 'remedial',
     color: 'rose',
-    description: 'Foundational reinforcement — revisit core concepts before moving on.',
+    description: 'Go back over the basics of this topic before moving on.',
     steps: [
       'Review foundational concepts',
-      'Watch concept explainer video',
+      'Watch the concept video',
       'Attempt easy practice questions',
       'Re-take diagnostic quiz',
     ],
@@ -31,7 +35,7 @@ const OUTCOME_CONTENT = {
     label: 'Practice Path',
     tier: 'practice',
     color: 'amber',
-    description: 'Consolidation — reinforce understanding through guided practice.',
+    description: 'You have the idea. More guided practice will make it stick.',
     steps: [
       'Review core concepts',
       'Attempt medium-difficulty practice quiz',
@@ -44,7 +48,7 @@ const OUTCOME_CONTENT = {
     label: 'Core Path',
     tier: 'core',
     color: 'indigo',
-    description: 'Standard progression — solid grasp, ready for the main lesson.',
+    description: 'You are ready for the main lesson on this topic.',
     steps: [
       'Complete the standard lesson',
       'Attempt intermediate assessment',
@@ -57,10 +61,10 @@ const OUTCOME_CONTENT = {
     label: 'Advanced Path',
     tier: 'advanced',
     color: 'emerald',
-    description: 'Accelerated progression — mastery achieved, tackle advanced challenges.',
+    description: 'You have mastered the basics. Move on to harder problems.',
     steps: [
       'Tackle the advanced lesson',
-      'Solve challenge / extension problems',
+      'Solve the challenge problems',
       'Explore related topics',
       'Mentor or review peer solutions',
     ],
@@ -80,32 +84,38 @@ function getContent(outcome) {
   };
 }
 
+// Everything the frontend shows for one run, straight from the compiler and lli.
+function payload(result, extra = {}) {
+  return { ...result, content: getContent(result.outcome), ...extra };
+}
+
 // ─── POST /api/alpc/compile ──────────────────────────────────────────────────
-// Compile raw Path-Lang source. No auth required (playground).
-router.post('/compile', async (req, res) => {
+// Compile and run raw Path-Lang source. No auth required (playground).
+router.post('/compile', compileLimit, async (req, res) => {
   try {
     const { source } = req.body;
     if (typeof source !== 'string' || !source.trim()) {
       return res.status(400).json({ error: '"source" string is required' });
     }
-    const runnerResult = await alpcRunner.compile(source);
-    const parsed       = parseCompilerResult(runnerResult, source);
-    return res.json({
-      success:        parsed.success,
-      outcome:        parsed.outcome,
-      alignmentScore: parsed.alignmentScore,
-      binaryOutput:   parsed.binaryOutput,
-      tokens:         parsed.tokens,
-      traceLines:     parsed.traceLines,
-      ast:            parsed.ast,
-      irSource:       parsed.irSource,
-      stages:         parsed.stages,
-      diagnostics:    parsed.diagnostics,
-      content:        getContent(parsed.outcome),
-    });
+    return res.json(payload(await alpcRunner.compile(source, { optimize: true })));
   } catch (err) {
-    console.error('[alpc/compile]', err.message);
-    return res.status(500).json({ error: err.message });
+    if (!err.status) console.error('[alpc/compile]', err.message);
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/alpc/check ────────────────────────────────────────────────────
+// Compile only, no execution: diagnostics with line and column for the editor.
+router.post('/check', checkLimit, async (req, res) => {
+  try {
+    const { source } = req.body;
+    if (typeof source !== 'string') {
+      return res.status(400).json({ error: '"source" string is required' });
+    }
+    if (!source.trim()) return res.json({ success: true, diagnostics: [], backwardDesign: null });
+    return res.json(await alpcRunner.check(source));
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -116,76 +126,12 @@ router.post('/pathway/generate', authMiddleware, async (req, res) => {
     const { skill, pathwayId, performance, mastery, attempts, completionRate } = req.body;
     if (!skill) return res.status(400).json({ error: '"skill" is required' });
 
-    // Resolve mastery from DB if not provided
-    let masteryScore = mastery;
-    if (masteryScore == null) {
-      const rec = await Mastery.findOne({ userId: req.user.id, skill });
-      masteryScore = rec ? rec.masteryScore : 0.3;
-    }
-
-    // Resolve performance: use provided or derive from mastery
-    let perfScore = performance;
-    if (perfScore == null) {
-      perfScore = (masteryScore <= 1 ? masteryScore : masteryScore / 100) * 100;
-    }
-
-    // Load custom pathway if specified
-    let pathway = null;
-    if (pathwayId) {
-      pathway = await Pathway.findById(pathwayId);
-    }
-
-    // Generate Path-Lang source
-    const source = generateForStudent({
-      studentData: { performance: perfScore, mastery: masteryScore, attempts, completionRate },
-      pathway,
+    const pathway = pathwayId ? await Pathway.findById(pathwayId) : null;
+    const { parsed, source, decisionId } = await decide({
+      userId: req.user.id, skill, pathway, performance, mastery, attempts, completionRate,
     });
 
-    // Compile via real ALPC binary
-    const runnerResult = await alpcRunner.compile(source);
-    const parsed       = parseCompilerResult(runnerResult, source);
-
-    // Persist compiler decision for traceability
-    let decisionId = null;
-    try {
-      const saved = await CompilerDecision.create({
-        userId:         req.user.id,
-        skill,
-        pathwayId:      pathway ? pathway._id : undefined,
-        pathLangSource: source,
-        outcome:        parsed.outcome,
-        alignmentScore: parsed.alignmentScore,
-        binaryOutput:   parsed.binaryOutput,
-        stages: parsed.stages.map(s => ({
-          id:       s.id,
-          status:   s.status,
-          stdout:   (s.stdout || '').slice(0, 4000),
-          stderr:   (s.stderr || '').slice(0, 1000),
-          exitCode: s.exitCode,
-        })),
-        performance: perfScore,
-        mastery:     masteryScore,
-      });
-      decisionId = saved._id;
-    } catch (saveErr) {
-      console.warn('[alpc] Failed to save CompilerDecision:', saveErr.message);
-    }
-
-    return res.json({
-      success:        parsed.success,
-      source,
-      outcome:        parsed.outcome,
-      alignmentScore: parsed.alignmentScore,
-      binaryOutput:   parsed.binaryOutput,
-      tokens:         parsed.tokens,
-      traceLines:     parsed.traceLines,
-      ast:            parsed.ast,
-      irSource:       parsed.irSource,
-      stages:         parsed.stages,
-      diagnostics:    parsed.diagnostics,
-      content:        getContent(parsed.outcome),
-      decisionId,
-    });
+    return res.json(payload(parsed, { source, decisionId }));
   } catch (err) {
     console.error('[alpc/pathway/generate]', err.message);
     return res.status(500).json({ error: err.message });
@@ -197,8 +143,8 @@ router.get('/decisions', authMiddleware, async (req, res) => {
   try {
     const decisions = await CompilerDecision.find({ userId: req.user.id })
       .sort({ createdAt: -1 })
-      .limit(10)
-      .select('-stages.stdout -stages.stderr -pathLangSource');
+      .limit(50)
+      .select('-stages.stdout -stages.stderr');
     return res.json({ decisions });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -208,9 +154,10 @@ router.get('/decisions', authMiddleware, async (req, res) => {
 // ─── GET /api/alpc/decisions/:id ─────────────────────────────────────────────
 router.get('/decisions/:id', authMiddleware, async (req, res) => {
   try {
+    if (!/^[0-9a-f]{24}$/i.test(req.params.id)) return res.status(404).json({ error: 'Decision not found' });
     const decision = await CompilerDecision.findOne({ _id: req.params.id, userId: req.user.id });
     if (!decision) return res.status(404).json({ error: 'Decision not found' });
-    return res.json({ decision });
+    return res.json({ decision, content: getContent(decision.outcome) });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -263,22 +210,8 @@ router.post('/pathways/:id/simulate', authMiddleware, async (req, res) => {
       studentData: { performance, mastery, attempts, completionRate },
       pathway,
     });
-    const runnerResult = await alpcRunner.compile(source);
-    const parsed       = parseCompilerResult(runnerResult, source);
-    return res.json({
-      success:        parsed.success,
-      source,
-      outcome:        parsed.outcome,
-      alignmentScore: parsed.alignmentScore,
-      binaryOutput:   parsed.binaryOutput,
-      tokens:         parsed.tokens,
-      traceLines:     parsed.traceLines,
-      ast:            parsed.ast,
-      irSource:       parsed.irSource,
-      stages:         parsed.stages,
-      diagnostics:    parsed.diagnostics,
-      content:        getContent(parsed.outcome),
-    });
+    const parsed = await alpcRunner.compile(source);
+    return res.json(payload(parsed, { source }));
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

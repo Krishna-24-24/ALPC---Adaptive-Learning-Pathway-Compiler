@@ -8,3 +8,14 @@ __pycache__/
 .venv/
 venv/
 .DS_Store
+
+obj/t/
+obj/san/
+obj/tmp/
+obj/pathway.*
+
+# Build output: make / build.bat recreate these, and CI uploads alpc.exe as an artifact.
+obj/
+/alpc
+/alpc.exe
+/pathway.ll

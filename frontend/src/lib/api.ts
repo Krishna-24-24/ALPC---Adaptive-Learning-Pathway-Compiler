@@ -32,13 +32,35 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
-  const data = await res.json();
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err;
+    throw new BackendUnavailableError();
+  }
+  const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new Error(data.error || 'Request failed');
+    throw new ApiError(data.error || `The server answered ${res.status} without saying why.`, res.status, data.code);
   }
   return data as T;
+}
+
+/** An error response from the backend, with its HTTP status and optional machine-readable code. */
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number, readonly code?: string) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+/** Thrown when the backend cannot be reached at all. */
+export class BackendUnavailableError extends Error {
+  constructor() {
+    super(`The backend is not reachable at ${API_URL}. Start it with npm run dev:backend and try again.`);
+    this.name = 'BackendUnavailableError';
+  }
 }
 
 export const api = {
@@ -63,8 +85,16 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ answers }) }
     ),
 
-  getAdaptiveQuiz: () =>
-    request<{ questions: QuizQuestion[]; count: number }>('/api/quiz/adaptive'),
+  getAdaptiveQuiz: (skill?: string) =>
+    request<{ questions: QuizQuestion[]; count: number; skill?: string }>(
+      skill ? `/api/quiz/adaptive?skill=${encodeURIComponent(skill)}` : '/api/quiz/adaptive'
+    ),
+
+  deleteAccount: (password: string) =>
+    request<{ deleted: true; removed: Record<string, number> }>('/api/auth/account', {
+      method: 'DELETE',
+      body: JSON.stringify({ password }),
+    }),
 
   submitAdaptive: (answers: AnswerSubmission[]) =>
     request<AdaptiveResult>('/api/quiz/adaptive/submit', {
@@ -86,6 +116,13 @@ export const api = {
       body: JSON.stringify({ source }),
     }),
 
+  checkPathLang: (source: string, signal?: AbortSignal) =>
+    request<AlpcCheckResult>('/api/alpc/check', {
+      method: 'POST',
+      body: JSON.stringify({ source }),
+      signal,
+    }),
+
   generatePathway: (body: {
     skill: string;
     performance?: number;
@@ -103,8 +140,21 @@ export const api = {
     request<{ decisions: AlpcDecision[] }>('/api/alpc/decisions'),
 
   getAlpcDecision: (id: string) =>
-    request<{ decision: AlpcDecision & { pathLangSource: string; stages: AlpcStage[] } }>(
+    request<{ decision: AlpcDecision & { stages: AlpcStage[] }; content: AlpcContent | null }>(
       `/api/alpc/decisions/${id}`
+    ),
+
+  // ── Study pages ───────────────────────────────────────────────────────────
+  getStudyTopics: () =>
+    request<{ topics: StudyTopic[] }>('/api/study'),
+
+  getStudy: (skill: string) =>
+    request<StudyPage>(`/api/study/${encodeURIComponent(skill)}`),
+
+  setStudyDone: (skill: string, resourceId: string, done: boolean) =>
+    request<{ resourceId: string; doneAt: string | null }>(
+      `/api/study/${encodeURIComponent(skill)}/done/${encodeURIComponent(resourceId)}`,
+      { method: done ? 'PUT' : 'DELETE' }
     ),
 
   getPathways: () =>
@@ -113,7 +163,7 @@ export const api = {
   createPathway: (body: {
     name: string; topic: string; description?: string;
     outcomes: { name: string; adjustment: number }[];
-    rules: { variable: string; operator: string; value: number; outcome: string }[];
+    rules: PathwayRule[];
   }) =>
     request<{ pathway: AlpcPathway }>('/api/alpc/pathways', {
       method: 'POST',
@@ -135,6 +185,8 @@ export interface QuizQuestion {
   difficulty: string;
   text: string;
   options: string[];
+  /** Stored index of the option shown at each position; send that index back. */
+  optionIndex?: number[];
   targetMastery?: number;
   recommendedDifficulty?: string;
 }
@@ -149,6 +201,10 @@ export interface QuizResult {
   skill: string;
   correct: boolean;
   updatedMastery: number;
+  question?: string;
+  yourAnswer?: string | null;
+  correctAnswer?: string;
+  explanation?: string | null;
 }
 
 export interface DashboardData {
@@ -159,6 +215,8 @@ export interface DashboardData {
     level: 'weak' | 'moderate' | 'strong';
   }[];
   masteryMap: Record<string, number>;
+  /** Topics past their review interval, most overdue first. */
+  review?: { skill: string; masteryPercent: number; lastPracticed: string; daysSince: number; intervalDays: number }[];
   weakestSkills: { skill: string; masteryScore: number; masteryPercent: number }[];
   learningPath: string[];
   nextTopic: {
@@ -213,8 +271,24 @@ export interface AlpcStage {
 
 export interface AlpcToken {
   line: number | null;
+  col?: number;
   type: string;
   lexeme: string;
+}
+
+export interface AlpcDiagnostic {
+  stage: string;
+  kind?: 'lexical' | 'syntax' | 'semantic' | 'runtime' | 'internal';
+  code?: string;
+  line?: number;
+  col?: number;
+  message: string;
+}
+
+export interface AlpcCheckResult {
+  success: boolean;
+  diagnostics: AlpcDiagnostic[];
+  backwardDesign: boolean | null;
 }
 
 export interface AlpcAstNode {
@@ -242,10 +316,23 @@ export interface AlpcCompileResult {
   ast: AlpcAstNode | null;
   irSource: string;
   stages: AlpcStage[];
-  diagnostics: { stage: string; message: string }[];
+  diagnostics: AlpcDiagnostic[];
+  backwardDesign?: boolean | null;
+  /** IR after LLVM's opt -O2 (playground only). */
+  optimizedIr?: string | null;
+  optimizeError?: string | null;
   content: AlpcContent | null;
   source?: string;
   decisionId?: string;
+}
+
+export interface PathwayRule {
+  variable: string;
+  operator: string;
+  value: number;
+  outcome: string;
+  /** Optional second comparison joined with AND or OR. */
+  also?: { connector: 'AND' | 'OR'; variable: string; operator: string; value: number };
 }
 
 export interface AlpcPathway {
@@ -254,7 +341,7 @@ export interface AlpcPathway {
   topic: string;
   description: string;
   outcomes: { name: string; adjustment: number }[];
-  rules: { variable: string; operator: string; value: number; outcome: string }[];
+  rules: PathwayRule[];
   defaultPathLang: string;
   createdAt: string;
 }
@@ -264,8 +351,48 @@ export interface AlpcDecision {
   skill: string;
   outcome: string | null;
   alignmentScore: number | null;
+  binaryOutput?: string | null;
   performance: number;
   mastery: number;
+  pathLangSource: string;
   createdAt: string;
 }
 
+// ── Study pages ──────────────────────────────────────────────────────────────
+
+export type StudyLevel = 'intro' | 'practice' | 'core' | 'advanced';
+
+export interface StudyResource {
+  id: string;
+  level: StudyLevel;
+  type: 'video' | 'article' | 'visualization' | 'problems';
+  title: string;
+  source: string;
+  url: string;
+  note: string;
+  doneAt: string | null;
+}
+
+export interface StudyTopic {
+  skill: string;
+  masteryPercent: number | null;
+  resources: number;
+  done: number;
+  outcome: string | null;
+}
+
+export interface StudyPage {
+  skill: string;
+  masteryPercent: number | null;
+  decision: {
+    decisionId: string | null;
+    outcome: string | null;
+    alignmentScore: number | null;
+    createdAt: string;
+    reused: boolean;
+    error: string | null;
+  };
+  levels: StudyLevel[] | null;
+  chosen: StudyResource[];
+  others: StudyResource[];
+}

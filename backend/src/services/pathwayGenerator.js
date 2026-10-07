@@ -27,6 +27,16 @@ function validate(outcomes, rules) {
   return errors;
 }
 
+/** "performance < 50", or "performance < 50 AND mastery < 40" when the rule has a second comparison. */
+function ruleCondition(rule) {
+  const first = `${rule.variable} ${rule.operator} ${rule.value}`;
+  const a = rule.also;
+  if (a && a.variable && (a.connector === 'AND' || a.connector === 'OR')) {
+    return `${first} ${a.connector} ${a.variable} ${a.operator} ${a.value}`;
+  }
+  return first;
+}
+
 // ─── Path-Lang generator ──────────────────────────────────────────────────────
 /**
  * Generate a valid Path-Lang source string.
@@ -64,7 +74,7 @@ function generatePathLang({ outcomes, variables = {}, rules }) {
   // ③ Conditional branch rules
   for (const rule of rules) {
     if (rule.variable && rule.outcome) {
-      lines.push(`IF ${rule.variable} ${rule.operator} ${rule.value} GOTO ${rule.outcome};`);
+      lines.push(`IF ${ruleCondition(rule)} GOTO ${rule.outcome};`);
     }
   }
 
@@ -111,6 +121,7 @@ function generateForStudent({ studentData, pathway = null }) {
 
 module.exports = {
   generatePathLang,
+  ruleCondition,
   generateForStudent,
   buildStudentVariables,
   validate,

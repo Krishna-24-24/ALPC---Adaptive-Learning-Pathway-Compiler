@@ -42,11 +42,13 @@ int check_program(const Program &p) {
       }
       vars.insert(s->name);
     } else if (const auto *b = dyn_cast<CondBranch>(node.get())) {
-      if (vars.find(b->var) == vars.end()) {
-        reportf(DK_SEMANTIC, "use-before-set", b->line(), b->col(),
-                "'%s' is used in a condition before it is set",
-                b->var.c_str());
-      }
+      for_each_compare(b->cond.get(), [&](const Compare &c) {
+        if (vars.find(c.var) == vars.end()) {
+          reportf(DK_SEMANTIC, "use-before-set", c.line(), c.col(),
+                  "'%s' is used in a condition before it is set",
+                  c.var.c_str());
+        }
+      });
       auto target = outcomes.find(b->target);
       if (target == outcomes.end() && all_outcomes.count(b->target) == 0) {
         reportf(DK_SEMANTIC, "unknown-outcome", b->line(), b->target_col,

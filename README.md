@@ -1,169 +1,135 @@
-# 🎓 ALPC + LearnSmart AI — Unified Adaptive Learning Platform
+# ALPC: Adaptive Learning Pathway Compiler
 
-> **A Compiler-Driven Adaptive Learning Platform Demonstrating Transparent, Formally Verified Educational Decision Making via Domain-Specific Language (Path-Lang) Compilation to LLVM IR.**
+[![CI](https://github.com/chakshurohilla007-design/ALPC---Adaptive-Learning-Pathway-Compiler/actions/workflows/ci.yml/badge.svg)](https://github.com/chakshurohilla007-design/ALPC---Adaptive-Learning-Pathway-Compiler/actions/workflows/ci.yml)
 
-[![Next.js 15](https://img.shields.io/badge/Frontend-Next.js%2015%20(React%2019)-blue?logo=nextdotjs&style=flat-square)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/Language-TypeScript-3178C6?logo=typescript&style=flat-square)](https://www.typescriptlang.org/)
-[![Tailwind CSS v4](https://img.shields.io/badge/Styles-Tailwind%20CSS%20v4-38B2AC?logo=tailwind-css&style=flat-square)](https://tailwindcss.com/)
-[![Express.js](https://img.shields.io/badge/Backend-Express.js-black?logo=express&style=flat-square)](https://expressjs.com/)
-[![MongoDB](https://img.shields.io/badge/Database-MongoDB-47A248?logo=mongodb&style=flat-square)](https://www.mongodb.com/)
-[![FastAPI](https://img.shields.io/badge/ML%20Engine-FastAPI%20(Python)-009688?logo=fastapi&style=flat-square)](https://fastapi.tiangolo.com/)
-[![C++17](https://img.shields.io/badge/Compiler-C%2B%2B17-00599C?logo=c%2B%2B&style=flat-square)](https://isocpp.org/)
-[![Flex](https://img.shields.io/badge/Lexer-Flex%202.6.4-orange?style=flat-square)](https://github.com/westes/flex)
-[![Bison](https://img.shields.io/badge/Parser-Bison%203.8.2-yellow?style=flat-square)](https://www.gnu.org/software/bison/)
-[![LLVM](https://img.shields.io/badge/Codegen-LLVM%20IR%20(lli)-purple?logo=llvm&style=flat-square)](https://llvm.org/)
-
----
-
-## 📌 Unified Project Layout (Single Root: `ALPC/`)
-
-Everything is self-contained in this single project directory (`C:\Users\Krishna\Projects\ALPC`). All build commands, backend services, frontend services, and ML engines run directly from here.
+A learning app where the decision about what a student studies next is made by a
+compiled program. Teachers write adaptive rules in **Path-Lang**, a small language
+built for this project. ALPC lexes it with Flex, parses it with Bison, checks it,
+generates LLVM IR and runs it with `lli`. The program prints the student's score
+and the outcome it reached, and the app follows that outcome. Every decision is
+stored, so a student can open any recommendation and see the program, the rule
+that was taken and each compiler stage.
 
 ```
-ALPC/
-├── backend/                  # Express.js REST API & ALPC Compiler Bridge
-│   ├── src/routes/alpc.js    # Compiler playground & pathway generation endpoints
-│   ├── src/services/alpcRunner.js # Executes alpc.exe & lli.exe
-│   ├── src/models/           # Pathway & CompilerDecision models
-│   └── .env                  # Port 5000, MongoDB, ALPC_BIN configuration
-│
-├── frontend/                 # Next.js 15 App Router Frontend (React 19, Tailwind v4)
-│   ├── src/app/compiler/     # ALPC Compiler Playground (/compiler)
-│   ├── src/app/pathway-builder/ # Adaptive Pathway Builder & Simulator (/pathway-builder)
-│   ├── src/app/dashboard/    # Student Dashboard + Adaptive Engine Card (/dashboard)
-│   └── src/app/quiz/results/ # Assessment Results + ALPC Decision Card
-│
-├── ml-service/               # FastAPI Python Psychometrics Engine (BKT & IRT 1PL)
-│   ├── app/main.py           # Bayesian Knowledge Tracing & IRT API
-│   └── venv/                 # Virtual environment (FastAPI, Uvicorn, Pydantic)
-│
-├── src/                      # Native C++ Compiler Engine
-│   ├── scanner.l             # Flex 2.6.4 lexical analyzer
-│   ├── parser.y              # Bison 3.8.2 LALR(1) grammar
-│   ├── ast.h / ast.cpp       # AST hierarchy with LLVM-style RTTI (classof, isa, dyn_cast)
-│   ├── codegen.h / codegen.cpp # LLVM IR code generator
-│   └── main.cpp              # CLI driver (--dump-tokens, --emit-ir, --json, etc.)
-│
-├── tests/                    # Compiler golden fixtures (14 valid, 10 invalid)
-├── examples/                 # Demonstration programs (pathway.edu)
-├── alpc.exe                  # Compiled static native compiler binary
-├── build.bat                 # 1-click Windows compiler build script
-├── demo.bat                  # 1-click full pipeline demo script
-├── package.json              # Root unified npm scripts (runs everything from ALPC)
-└── Makefile                  # GNU Makefile for building the compiler
+OUTCOME remedial;
+OUTCOME practice;
+OUTCOME core;
+
+SET performance = 62;
+SET mastery = 35;
+SET state = 62;
+
+IF performance < 50 OR mastery < 25 GOTO remedial;
+IF (performance < 70 OR mastery < 40) AND performance >= 50 GOTO practice;
+IF performance >= 50 GOTO core;
 ```
 
----
+Running this prints `62` and then `outcome practice`.
 
-## 🚀 How to Run in Local (All from `ALPC`)
+## What is in the app
 
-Open your terminals directly in **`C:\Users\Krishna\Projects\ALPC`**.
-
-### 🟢 Terminal 1: Express Backend (Port 5000)
-
-```powershell
-cd C:\Users\Krishna\Projects\ALPC
-npm run dev:backend
-```
-> Starts the Express backend on `http://localhost:5000`. Connects to MongoDB and shells out directly to `alpc.exe`.
-
----
-
-### 🟢 Terminal 2: Python ML Engine (Port 8000)
-
-```powershell
-cd C:\Users\Krishna\Projects\ALPC
-npm run dev:ml
-```
-> Starts the FastAPI psychometrics engine on `http://localhost:8000` with Bayesian Knowledge Tracing (BKT) and Item Response Theory (IRT).
-
----
-
-### 🟢 Terminal 3: Next.js Frontend (Port 3000)
-
-```powershell
-cd C:\Users\Krishna\Projects\ALPC
-npm run dev:frontend
-```
-> Starts the Next.js 15 web UI on `http://localhost:3000`.
-
----
-
-## ⚡ Useful One-Click CLI Commands (Run from `ALPC`)
-
-All commands run directly in `C:\Users\Krishna\Projects\ALPC`:
-
-| Command | Action |
+| Page | What it does |
 |---|---|
-| `npm test` | Runs the PRD Section 33 integration suite (14 tests; the 6 end-to-end ones run the real `alpc.exe` + `lli`, so rebuild the compiler first). |
-| `npm run seed` | Seeds the MongoDB database with initial DSA skills and questions. |
-| `npm run demo:compiler` | Runs the full 5-stage compiler pipeline demo on `examples/pathway.edu`. |
-| `npm run build:compiler` | Recompiles `alpc.exe` using Flex, Bison, and g++ (takes ~3s). |
-| `npm run build:frontend` | Runs a production Next.js build with Turbopack. |
+| Playground (`/compiler`) | Edit Path-Lang with errors underlined as you type. Compile and run it, then inspect tokens, the parse trace, the AST, the LLVM IR, the control-flow graph (with the path that ran) and the IR after `opt -O2`. |
+| Pathway builder (`/pathway-builder`) | Build rules with a form, including a second condition joined by AND or OR, test them on a sample student and save them. |
+| Dashboard (`/dashboard`) | Mastery per topic (Bayesian Knowledge Tracing), accuracy by week, topics due for review and the latest compiler decision. |
+| Study (`/study`) | One page per topic with videos, articles, visualisations and problem sets. The compiled outcome decides which level you see first. Mark resources as done. |
+| Quizzes (`/quiz/...`) | A 15-question diagnostic, a mixed practice quiz on your weakest topics, and a 5-question quiz on one topic. Options are shuffled every time; results show the right answer and why. |
+| Decision history (`/history`) | Every decision made for you. Each one opens to the program, the rule taken, every stage and the printed output. |
+| Account (`/account`) | Delete your account and everything stored for it. |
 
----
+## How a decision is made
 
-## 🌐 Navigating the Web Application
+1. Your quiz answers update your mastery per topic (ML service, BKT and IRT).
+2. The backend writes a Path-Lang program: your numbers become `SET` lines and the
+   pathway's rules become `IF … GOTO` lines.
+3. `alpc --json` compiles it, and `lli` runs the generated IR.
+4. The program prints two lines: the alignment score and `outcome <name>`. That line
+   is the decision. Nothing re-evaluates the rules in JavaScript.
+5. The program, every stage's output and the outcome are saved as a compiler decision.
 
-With the services running, open **`http://localhost:3000`** in your browser:
+The language and the compiler's guarantees are specified in [SPEC.md](SPEC.md).
 
-1. **[Compiler Playground](http://localhost:3000/compiler)** (`/compiler`):
-   - Live Path-Lang code editor.
-   - Inspect the real **Flex tokens**, **Bison parse trace**, **AST tree (RTTI)**, **LLVM IR**, and **JIT execution output**.
-   - Preset examples for 4-tier adaptive logic, `; b` binary output, and Backward Design violation checks.
+## Repository layout
 
-2. **[Adaptive Pathway Builder](http://localhost:3000/pathway-builder)** (`/pathway-builder`):
-   - Visual rule builder for educators.
-   - Live Path-Lang code preview (enforcing Backward Design).
-   - **Student Simulation Mode**: Drag performance sliders &rarr; click **Run Adaptive Pathway** &rarr; watch the real compiler pipeline execute in real time.
-
-3. **[Student Dashboard](http://localhost:3000/dashboard)** (`/dashboard`):
-   - View skill proficiency, recent quiz performance, and the embedded **Adaptive Learning Engine** compiler decision card.
-
-4. **[Adaptive Assessment](http://localhost:3000/quiz/adaptive)** (`/quiz/adaptive`):
-   - Practice assessment with questions matched to mastery.
-   - On completion, results automatically trigger ALPC to compile a personalized multi-step study plan.
-
----
-
-## 🧪 Verification & Acceptance Tests
-
-Run the integration test suite:
-
-```powershell
-cd C:\Users\Krishna\Projects\ALPC
-npm test
+```
+src/            the compiler: scanner.l (Flex), parser.y (Bison), ast, semantics, codegen, main
+tests/          compiler fixtures (golden tokens, trace, AST, IR checks, run output) and AST unit tests
+examples/       pathway.edu and its expected output
+backend/        Express API: runs alpc, lli and opt; MongoDB models; study resources
+  src/data/resources.json   study links per topic and level (edit freely)
+frontend/       Next.js 15 app
+ml-service/     FastAPI service for mastery (BKT) and question difficulty (IRT)
+docs/           architecture, API, demo script, decision records
 ```
 
-**Results:**
-```
-========================================
- ALPC + LearnSmart Integration Tests
-========================================
+## Deploy online
 
-  ✓ Test 1: Student score 40 maps to REMEDIAL outcome
-  ✓ Test 2: Student score 65 maps to PRACTICE/CORE outcome
-  ✓ Test 3: Student score 90 maps to ADVANCED outcome
-  ✓ Test 4: Rule referencing undeclared outcome detected
-  ✓ Test 5: Backward Design — OUTCOME declared before SET & IF
-  ✓ Test 6: Token parsing handles keywords, identifiers, and literals
-  ✓ Test 7: AST parser constructs hierarchical tree from dump-ast
-  ✓ Test 8: Binary output (; b) parsing
-  ✓ Run output: decimal score made of 0s and 1s is not read as binary
-  ✓ E2E: default pathway compiles and runs (score 40)
-  ✓ E2E: default pathway compiles and runs (score 65)
-  ✓ E2E: default pathway compiles and runs (score 90)
-  ✓ E2E: Alignment Score comes from execution (state += 15, and ; b)
-  ✓ E2E: unknown outcome is rejected with line and column
+Follow [docs/DEPLOY.md](docs/DEPLOY.md) for MongoDB Atlas, the two Render services,
+and the Vercel frontend. The root Dockerfile includes the compiler and LLVM; do
+not deploy the legacy backend-only Dockerfile.
 
-Results: 14 passed, 0 failed.
-```
+## Setting up on Windows
 
-The E2E tests use `ALPC_BIN` / `LLI_BIN` (same variables as the backend) and are skipped
-when the compiler binary is not found.
+1. **Compiler toolchain.** Install [MSYS2](https://www.msys2.org), then in the
+   *MSYS2 MINGW64* terminal:
+   ```bash
+   pacman -S --needed make flex bison diffutils mingw-w64-x86_64-gcc mingw-w64-x86_64-llvm
+   ```
+2. **Build the compiler** from the repo root, in that terminal:
+   ```bash
+   make
+   make check        # every fixture should pass
+   ```
+   `npm run build:compiler` (build.bat) does the same from PowerShell. The binary
+   is not kept in git; CI builds one for Windows on every push (Actions → the run →
+   `alpc-windows`).
+3. **MongoDB.** Install it (`winget install MongoDB.Server`) or use Atlas.
+4. **Backend config.** Copy `backend/.env.example` to `backend/.env` and fill it in.
+5. **Dependencies.**
+   ```powershell
+   npm install --prefix backend
+   npm install --prefix frontend
+   npm run setup:ml
+   ```
+6. **Run** each in its own terminal from the repo root:
+   ```powershell
+   npm run dev:backend      # http://localhost:5000
+   npm run dev:ml           # http://localhost:8000
+   npm run dev:frontend     # http://localhost:3000
+   ```
 
-Compiler fixtures (lexer, parser, AST, IR, execution and `--json` goldens):
+## Configuration (`backend/.env`)
 
-```bash
-make check
-```
+| Variable | Default | Purpose |
+|---|---|---|
+| `MONGODB_URI` | `mongodb://127.0.0.1:27017/learnsmart` | Database |
+| `JWT_SECRET` | development key | Signs login tokens. With `NODE_ENV=production` the server will not start unless this is a private value of at least 32 characters. |
+| `ML_SERVICE_URL` | `http://127.0.0.1:8000` | Mastery service |
+| `FRONTEND_URL` | `http://localhost:3000` in development | Exact CORS origin, required in production; no trailing slash |
+| `TRUST_PROXY_HOPS` | `0` | Set to `1` for the single Render proxy; keep `0` for direct local access |
+| `ML_SERVICE_HOST` | unset | Render public ML hostname; used with HTTPS when `ML_SERVICE_URL` is unset |
+| `ML_TIMEOUT_MS` | `5000` | ML request timeout; the Blueprint sets `120000` for cold starts |
+| `ALPC_BIN` | `alpc.exe` / `alpc` in the repo root | Compiler |
+| `LLI_BIN`, `OPT_BIN` | `lli`, `opt` on PATH | LLVM interpreter and optimizer |
+| `COMPILE_PER_MINUTE`, `CHECK_PER_MINUTE` | `30`, `150` | Per-client limits on the public compile and live-check routes |
+
+## Tests
+
+| Command | Covers |
+|---|---|
+| `make check` | Every compiler fixture: tokens, parse trace, AST, IR verified with `opt`, and `lli` output |
+| `make test-asan` | The same fixtures and AST unit tests under ASan/UBSan on Linux; UBSan trap mode on Windows |
+| `npm test` | Backend: the PRD integration tests, study pages, and features (review schedule, option shuffling, JWT rule, rate limits, account deletion, AND/OR rules, optimizer). Uses the real compiler. |
+| `npm run build:frontend` | Production build of the app |
+
+GitHub Actions runs all of them, plus a Windows compiler build and Docker image
+builds with API/compiler/ML smoke tests, on every push
+([.github/workflows/ci.yml](.github/workflows/ci.yml)).
+
+## Before deploying
+
+- Set `NODE_ENV=production` and a private `JWT_SECRET`.
+- Set `FRONTEND_URL` to the site's address, not `*`.
+- The rate limiter keeps its counts in memory, which suits one backend process. With
+  several processes, rate-limit at the proxy instead.
