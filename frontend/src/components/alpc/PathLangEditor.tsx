@@ -1,69 +1,61 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface Props {
   value: string;
   onChange: (v: string) => void;
   readOnly?: boolean;
   minRows?: number;
+  label?: string;
 }
 
-export function PathLangEditor({ value, onChange, readOnly = false, minRows = 12 }: Props) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const lineRows    = value.split('\n').length;
-  const rows        = Math.max(lineRows, minRows);
+const LINE = 22; // px, matches leading-[22px]
+
+/** A plain textarea with line numbers. Tab inserts two spaces. */
+export function PathLangEditor({ value, onChange, readOnly = false, minRows = 12, label = 'Path-Lang source' }: Props) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const rows = Math.max(value.split('\n').length, minRows);
 
   useEffect(() => {
-    const el = textareaRef.current;
+    const el = ref.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${Math.max(el.scrollHeight, minRows * 21)}px`;
+    el.style.height = `${Math.max(el.scrollHeight, minRows * LINE + 24)}px`;
   }, [value, minRows]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const el    = e.currentTarget;
-      const start = el.selectionStart;
-      const end   = el.selectionEnd;
-      const next  = value.slice(0, start) + '  ' + value.slice(end);
-      onChange(next);
-      requestAnimationFrame(() => {
-        if (textareaRef.current) {
-          textareaRef.current.selectionStart = start + 2;
-          textareaRef.current.selectionEnd   = start + 2;
-        }
-      });
-    }
-  };
+  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key !== 'Tab' || readOnly) return;
+    e.preventDefault();
+    const el = e.currentTarget;
+    const { selectionStart: a, selectionEnd: b } = el;
+    onChange(value.slice(0, a) + '  ' + value.slice(b));
+    requestAnimationFrame(() => {
+      if (ref.current) ref.current.selectionStart = ref.current.selectionEnd = a + 2;
+    });
+  }
 
   return (
-    <div className="relative rounded-lg overflow-hidden border border-white/[0.08] bg-black/25">
-      {/* Gutter */}
-      <div className="absolute top-0 left-0 w-10 h-full bg-white/[0.015] border-r border-white/[0.05] pointer-events-none z-10" />
-      {/* Line numbers */}
-      <div className="absolute top-0 left-0 w-10 pt-4 pb-4 pointer-events-none select-none z-10" aria-hidden>
+    <div className="listing relative flex">
+      <div aria-hidden className="select-none border-r border-[var(--rule-soft)] py-3 pl-2 pr-2 text-right t-faint">
         {Array.from({ length: rows }, (_, i) => (
-          <div key={i} className="h-[21px] flex items-center justify-end pr-2 text-[10px] text-white/18 font-mono">
-            {i + 1}
-          </div>
+          <div key={i} className="h-[22px] text-xs leading-[22px] t-num">{i + 1}</div>
         ))}
       </div>
-      {/* Editor */}
       <textarea
-        ref={textareaRef}
+        ref={ref}
+        aria-label={label}
         value={value}
         onChange={e => onChange(e.target.value)}
-        onKeyDown={handleKeyDown}
+        onKeyDown={onKeyDown}
         readOnly={readOnly}
         spellCheck={false}
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="off"
-        className="w-full bg-transparent text-[13px] font-mono text-white/80 leading-[21px] py-4 pr-4 pl-14 resize-none outline-none placeholder:text-white/20 relative z-0"
-        placeholder={`OUTCOME remedial;\nOUTCOME core;\nOUTCOME advanced;\n\nSET performance = 72;\nSET state = 0;\n\nIF performance < 50 GOTO remedial;\nIF performance < 80 GOTO core;\nIF performance >= 80 GOTO advanced;`}
-        style={{ minHeight: `${minRows * 21 + 32}px` }}
+        wrap="off"
+        className="block min-w-0 flex-1 resize-none overflow-x-auto bg-transparent px-3 py-3 font-[family-name:var(--font-mono)] text-[0.8125rem] leading-[22px] text-[var(--ink)] outline-none focus-visible:outline-2 focus-visible:outline-[var(--focus)]"
+        style={{ minHeight: `${minRows * LINE + 24}px` }}
       />
     </div>
   );

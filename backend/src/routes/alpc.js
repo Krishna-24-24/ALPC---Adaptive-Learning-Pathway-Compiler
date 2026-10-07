@@ -18,10 +18,10 @@ const OUTCOME_CONTENT = {
     label: 'Remedial Path',
     tier: 'remedial',
     color: 'rose',
-    description: 'Foundational reinforcement — revisit core concepts before moving on.',
+    description: 'Go back over the basics of this topic before moving on.',
     steps: [
       'Review foundational concepts',
-      'Watch concept explainer video',
+      'Watch the concept video',
       'Attempt easy practice questions',
       'Re-take diagnostic quiz',
     ],
@@ -31,7 +31,7 @@ const OUTCOME_CONTENT = {
     label: 'Practice Path',
     tier: 'practice',
     color: 'amber',
-    description: 'Consolidation — reinforce understanding through guided practice.',
+    description: 'You have the idea. More guided practice will make it stick.',
     steps: [
       'Review core concepts',
       'Attempt medium-difficulty practice quiz',
@@ -44,7 +44,7 @@ const OUTCOME_CONTENT = {
     label: 'Core Path',
     tier: 'core',
     color: 'indigo',
-    description: 'Standard progression — solid grasp, ready for the main lesson.',
+    description: 'You are ready for the main lesson on this topic.',
     steps: [
       'Complete the standard lesson',
       'Attempt intermediate assessment',
@@ -57,10 +57,10 @@ const OUTCOME_CONTENT = {
     label: 'Advanced Path',
     tier: 'advanced',
     color: 'emerald',
-    description: 'Accelerated progression — mastery achieved, tackle advanced challenges.',
+    description: 'You have mastered the basics. Move on to harder problems.',
     steps: [
       'Tackle the advanced lesson',
-      'Solve challenge / extension problems',
+      'Solve the challenge problems',
       'Explore related topics',
       'Mentor or review peer solutions',
     ],

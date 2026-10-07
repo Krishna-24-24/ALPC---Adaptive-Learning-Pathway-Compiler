@@ -1,82 +1,57 @@
 'use client';
 
-import { useState } from 'react';
-import { ChevronRight, ChevronDown } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import type { AlpcAstNode } from '@/lib/api';
 
-const NODE_PALETTE: [string, string][] = [
-  ['Program',    'text-indigo-400'],
-  ['Outcome',    'text-violet-400'],
-  ['Assignment', 'text-blue-400'  ],
-  ['Branch',     'text-amber-400' ],
-  ['Condition',  'text-rose-400'  ],
-];
+const FIELD_RE = /(\w+)=("[^"]*"|\S+)/g;
 
-function nodeColor(label: string): string {
-  for (const [prefix, color] of NODE_PALETTE) {
-    if (label.startsWith(prefix)) return color;
-  }
-  return 'text-white/60';
-}
-
-function TreeNode({ node, depth = 0 }: { node: AlpcAstNode; depth?: number }) {
-  const [open, setOpen] = useState(true);
-  const hasChildren = node.children.length > 0;
-
-  return (
-    <div>
-      <button
-        onClick={() => hasChildren && setOpen(o => !o)}
-        className={[
-          'flex items-center gap-1.5 py-0.5 w-full text-left rounded px-1',
-          hasChildren ? 'cursor-pointer hover:bg-white/[0.03]' : 'cursor-default',
-        ].join(' ')}
-        style={{ paddingLeft: `${depth * 14}px` }}
-      >
-        {hasChildren ? (
-          <span className="text-white/25 w-4 flex-shrink-0 flex items-center">
-            {open
-              ? <ChevronDown  className="h-3 w-3" />
-              : <ChevronRight className="h-3 w-3" />
-            }
-          </span>
-        ) : (
-          <span className="w-4 flex-shrink-0 text-white/20 text-[10px] flex items-center">└</span>
-        )}
-        <span className={`text-xs font-mono ${nodeColor(node.label)}`}>{node.label}</span>
-      </button>
-
-      <AnimatePresence initial={false}>
-        {open && hasChildren && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.12 }}
-          >
-            {node.children.map((child, i) => (
-              <TreeNode key={i} node={child} depth={depth + 1} />
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
+/** Splits a --dump-ast line such as `CondBranch  line=10  var="performance"` into kind and fields. */
+function parseLabel(label: string) {
+  const kind = label.trim().split(/\s+/)[0];
+  const fields: [string, string][] = [];
+  let m: RegExpExecArray | null;
+  FIELD_RE.lastIndex = 0;
+  while ((m = FIELD_RE.exec(label)) !== null) fields.push([m[1], m[2].replace(/^"|"$/g, '')]);
+  return { kind, fields };
 }
 
 export function AstTree({ ast }: { ast: AlpcAstNode | null }) {
   if (!ast) {
-    return (
-      <p className="text-center text-white/30 text-sm py-10">
-        No AST yet — compile a Path-Lang program to see the RTTI tree.
-      </p>
-    );
+    return <p className="py-8 text-sm t-graphite">Compile a program to see the syntax tree the parser built.</p>;
   }
 
+  const root = parseLabel(ast.label);
+  const binary = root.fields.find(([k]) => k === 'binary_output')?.[1] === '1';
+
   return (
-    <div className="overflow-auto max-h-96 rounded-lg border border-white/[0.06] p-3 bg-black/20">
-      <TreeNode node={ast} />
+    <div>
+      <p className="mb-3 text-sm">
+        <span className="font-semibold">{root.kind}</span>
+        <span className="t-graphite">, {ast.children.length} statements, binary output {binary ? 'on' : 'off'}</span>
+      </p>
+      <div className="max-h-[28rem] overflow-auto">
+        <table className="table text-[0.8125rem]">
+          <thead className="sticky top-0 bg-[var(--sheet)]">
+            <tr><th className="w-28">Node</th><th className="w-14">Line</th><th>Fields</th></tr>
+          </thead>
+          <tbody>
+            {ast.children.map((child, i) => {
+              const { kind, fields } = parseLabel(child.label);
+              const line = fields.find(([k]) => k === 'line')?.[1];
+              return (
+                <tr key={i}>
+                  <td className="font-medium">{kind}</td>
+                  <td className="t-faint t-num">{line}</td>
+                  <td className="font-[family-name:var(--font-mono)]">
+                    {fields.filter(([k]) => k !== 'line').map(([k, v]) => (
+                      <span key={k} className="mr-4 whitespace-nowrap"><span className="t-graphite">{k}</span> {v}</span>
+                    ))}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
