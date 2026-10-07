@@ -24,9 +24,7 @@ export default function RegisterPage() {
       if (data.user) setUser(data.user);
       router.push('/quiz/diagnostic');
     } catch (err) {
-      setError(err instanceof Error && err.message !== 'Failed to fetch'
-        ? err.message
-        : 'The server did not respond. Check that the backend is running.');
+      setError(err instanceof Error ? err.message : 'The request failed.');
     } finally {
       setLoading(false);
     }

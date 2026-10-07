@@ -13,9 +13,11 @@ export const STAGE_META: Record<StageId, { label: string; tool: string }> = {
 export const STAGE_ORDER: StageId[] = ['tokens', 'parse', 'ast', 'ir', 'run'];
 
 /** Pass, fail, or not evaluated, read from the compiler's own diagnostics. */
-export function backwardDesignStatus(result: AlpcCompileResult | null): 'pass' | 'fail' | 'unknown' {
+export function backwardDesignStatus(result: Pick<AlpcCompileResult, 'diagnostics' | 'stages' | 'backwardDesign'> | null): 'pass' | 'fail' | 'unknown' {
   if (!result) return 'unknown';
-  const all = [...(result.diagnostics || []).map(d => d.message), ...(result.stages || []).map(s => s.stderr || '')].join('\n');
+  if (result.backwardDesign === true) return 'pass';
+  if (result.backwardDesign === false) return 'fail';
+  const all = [...(result.diagnostics || []).map(d => d.message), ...(result.stages || []).map(st => st.stderr || '')].join('\n');
   if (/Backward Design violation/.test(all)) return 'fail';
   const parse = result.stages?.find(s => s.id === 'parse');
   return parse?.status === 'success' ? 'pass' : 'unknown';

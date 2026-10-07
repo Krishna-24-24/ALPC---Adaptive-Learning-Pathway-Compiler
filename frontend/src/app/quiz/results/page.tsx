@@ -14,6 +14,7 @@ export default function ResultsPage() {
   const [compiling, setCompiling] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [showTrace, setShowTrace] = useState(false);
+  const [studySkill, setStudySkill] = useState<string | null>(null);
 
   useEffect(() => {
     const raw = sessionStorage.getItem('learnsmart_quiz_result');
@@ -24,6 +25,7 @@ export default function ResultsPage() {
     // Compile the student's next step with ALPC from this quiz's numbers.
     const skill = parsed.recommendations?.[0]?.skill || parsed.results?.[0]?.skill;
     if (skill) {
+      setStudySkill(skill);
       setCompiling(true);
       api.generatePathway({
         skill,
@@ -77,9 +79,15 @@ export default function ResultsPage() {
             <>
               <OutcomeCard result={decision} />
               <div className="flex flex-wrap gap-2">
+                {studySkill && (
+                  <Link href={`/study/${encodeURIComponent(studySkill)}`} className="btn btn-primary btn-sm">Study {studySkill}</Link>
+                )}
                 <button type="button" className="btn btn-outline btn-sm" aria-expanded={showTrace} onClick={() => setShowTrace(v => !v)}>
                   {showTrace ? 'Hide compiler trace' : 'Show compiler trace'}
                 </button>
+                {decision.decisionId && (
+                  <Link href={`/history/${decision.decisionId}`} className="btn btn-quiet btn-sm">Why this?</Link>
+                )}
                 <Link href="/compiler" className="btn btn-quiet btn-sm">Open the playground</Link>
               </div>
               {showTrace && (

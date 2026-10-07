@@ -23,9 +23,7 @@ export default function LoginPage() {
       if (data.user) setUser(data.user);
       router.push(data.user?.diagnosticCompleted ? '/dashboard' : '/quiz/diagnostic');
     } catch (err) {
-      setError(err instanceof Error && err.message !== 'Failed to fetch'
-        ? err.message
-        : 'The server did not respond. Check that the backend is running.');
+      setError(err instanceof Error ? err.message : 'The request failed.');
     } finally {
       setLoading(false);
     }

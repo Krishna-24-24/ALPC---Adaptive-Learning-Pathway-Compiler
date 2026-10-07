@@ -29,7 +29,7 @@ export default function AdaptiveQuizPage() {
     return (
       <div className="mx-auto max-w-[44rem] px-4 py-16 sm:px-6">
         <h1 className="text-[1.75rem]">The quiz could not load</h1>
-        <p className="mt-2 t-graphite">{error}. Check that the backend and the ML service are running.</p>
+        <p className="mt-2 t-graphite">{error}</p>
       </div>
     );
   }

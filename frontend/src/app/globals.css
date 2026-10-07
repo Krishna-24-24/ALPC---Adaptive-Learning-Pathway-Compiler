@@ -249,6 +249,14 @@ input[type='range'] { accent-color: var(--ink); width: 100%; }
 .syn-comment { color: var(--faint); font-style: italic; }
 .syn-ident { color: var(--ink); }
 
+/* A compiler diagnostic on the code itself, at the reported line and column. */
+.pl-error {
+  text-decoration: underline wavy var(--mark);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+  text-decoration-skip-ink: none;
+}
+
 /* Margin annotations: the one expressive element. */
 .hand {
   font-family: var(--font-hand);

@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useState } from 'react';
-import { api, type AlpcCompileResult } from '@/lib/api';
+import { useCallback, useEffect, useState } from 'react';
+import { api, BackendUnavailableError, type AlpcCheckResult, type AlpcCompileResult } from '@/lib/api';
 import { PathLangEditor } from '@/components/alpc/PathLangEditor';
 import { PipelineVisualization } from '@/components/alpc/PipelineVisualization';
 import { TokenTable } from '@/components/alpc/TokenTable';
@@ -79,6 +79,25 @@ export default function CompilerPlayground() {
   const [requestError, setRequestError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabId>('result');
   const [copied, setCopied] = useState(false);
+  // Compile-only check while typing, for red underlines in the editor.
+  const [live, setLive] = useState<{ state: 'checking' | 'done' | 'offline'; result: AlpcCheckResult | null }>({ state: 'checking', result: null });
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    setLive(l => ({ ...l, state: 'checking' }));
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.checkPathLang(source, ctrl.signal);
+        setLive({ state: 'done', result: r });
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (err instanceof BackendUnavailableError) { setLive({ state: 'offline', result: null }); return; }
+        const message = err instanceof Error ? err.message : 'The check failed.';
+        setLive({ state: 'done', result: { success: false, backwardDesign: null, diagnostics: [{ stage: 'check', kind: 'internal', message }] } });
+      }
+    }, 350);
+    return () => { clearTimeout(t); ctrl.abort(); };
+  }, [source]);
 
   const compile = useCallback(async () => {
     setCompiling(true);
@@ -90,9 +109,7 @@ export default function CompilerPlayground() {
     } catch (err) {
       setResult(null);
       setRequestError(
-        err instanceof Error && err.message !== 'Failed to fetch'
-          ? err.message
-          : 'The backend did not respond. Start it with npm run dev:backend and try again.',
+        err instanceof Error ? err.message : 'The request failed.',
       );
     } finally {
       setCompiling(false);
@@ -106,7 +123,10 @@ export default function CompilerPlayground() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const bd = backwardDesignStatus(result);
+  // Prefer the live check (it follows every keystroke); fall back to the last full run.
+  const bd = backwardDesignStatus(live.result ? { diagnostics: live.result.diagnostics, stages: [], backwardDesign: live.result.backwardDesign } : result);
+  const liveDiags = (live.result?.diagnostics || []).filter(d => d.kind !== 'internal');
+  const internal = live.result?.diagnostics.find(d => d.kind === 'internal');
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: 'result', label: 'Result' },
     { id: 'pipeline', label: 'Pipeline' },
@@ -146,7 +166,16 @@ export default function CompilerPlayground() {
 
       <div className="grid gap-8 lg:grid-cols-2">
         <div className="min-w-0 space-y-3">
-          <PathLangEditor value={source} onChange={v => { setSource(v); }} minRows={16} />
+          <PathLangEditor value={source} onChange={setSource} minRows={16} diagnostics={liveDiags} />
+          <p className="text-sm" aria-live="polite">
+            {live.state === 'checking' && <span className="t-graphite">Checking…</span>}
+            {live.state === 'offline' && <span className="t-graphite">Live checking is off because the backend is not reachable.</span>}
+            {live.state === 'done' && internal && <span className="t-mark">{internal.message}</span>}
+            {live.state === 'done' && !internal && liveDiags.length === 0 && <span className="t-pass">Checked as you type: no problems.</span>}
+            {live.state === 'done' && !internal && liveDiags.length > 0 && (
+              <span className="t-mark">{liveDiags.length === 1 ? '1 problem' : `${liveDiags.length} problems`} found while you typed. Fix {liveDiags.length === 1 ? 'it' : 'them'} before compiling.</span>
+            )}
+          </p>
           {requestError && <p className="notice notice-error" role="alert">{requestError}</p>}
           <p className="text-sm">
             <span className="font-medium">Backward Design check: </span>

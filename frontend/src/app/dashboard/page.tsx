@@ -51,7 +51,7 @@ export default function DashboardPage() {
     return (
       <div className="mx-auto max-w-[76rem] px-4 py-16 sm:px-6">
         <h1 className="text-[1.75rem]">The dashboard could not load</h1>
-        <p className="mt-2 t-graphite">{error || 'The server returned no data.'} Check that the backend and the ML service are running, then try again.</p>
+        <p className="mt-2 t-graphite">{error || 'The server returned no data.'}</p>
         <button type="button" onClick={() => window.location.reload()} className="btn btn-outline mt-6">Try again</button>
       </div>
     );
@@ -59,6 +59,7 @@ export default function DashboardPage() {
 
   const { analytics } = data;
   const skills = [...data.skills].sort((a, b) => a.masteryPercent - b.masteryPercent);
+  const weakest = data.weakestSkills[0] ?? null;
 
   return (
     <div className="mx-auto max-w-[76rem] px-4 py-8 sm:px-6">
@@ -70,7 +71,12 @@ export default function DashboardPage() {
             {analytics.weakestSkill.skill}, strongest is {analytics.strongestSkill.skill}.
           </p>
         </div>
-        <Link href="/quiz/adaptive" className="btn btn-primary">Practise your weakest topics</Link>
+        <div className="flex flex-wrap gap-2">
+          {weakest && (
+            <Link href={`/study/${encodeURIComponent(weakest.skill)}`} className="btn btn-primary">Study {weakest.skill}</Link>
+          )}
+          <Link href="/quiz/adaptive" className="btn btn-outline">Practice quiz</Link>
+        </div>
       </header>
 
       <div className="grid gap-12 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
@@ -127,15 +133,18 @@ export default function DashboardPage() {
               <h2 id="next-h" className="text-lg">Study next: {data.nextTopic.skill}</h2>
               <p className="mt-2 text-[0.9375rem]">{data.nextTopic.reason}</p>
               <p className="mt-2 text-sm t-graphite">Current mastery {data.nextTopic.masteryPercent}%.</p>
-              <Link href="/quiz/adaptive" className="btn btn-outline btn-sm mt-4">Start a practice quiz</Link>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link href={`/study/${encodeURIComponent(data.nextTopic.skill)}`} className="btn btn-outline btn-sm">Open the study page</Link>
+                <Link href="/quiz/adaptive" className="btn btn-quiet btn-sm">Start a practice quiz</Link>
+              </div>
             </section>
           )}
 
-          {data.weakestSkills.length > 0 && (
+          {weakest && (
             <AdaptiveEngineSection
-              skill={data.weakestSkills[0].skill}
-              performance={analytics.averageMasteryPercent}
-              mastery={analytics.averageMastery}
+              skill={weakest.skill}
+              performance={weakest.masteryPercent}
+              mastery={weakest.masteryScore}
             />
           )}
 

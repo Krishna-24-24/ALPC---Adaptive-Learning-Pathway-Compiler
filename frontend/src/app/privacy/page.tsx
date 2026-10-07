@@ -19,6 +19,7 @@ export default function PrivacyPage() {
         <li><strong>Mastery estimates:</strong> one score between 0 and 1 per topic, updated after each answer.</li>
         <li><strong>Recommendations:</strong> the study suggestions generated for you.</li>
         <li><strong>Compiler decisions:</strong> the Path-Lang program generated for you, the outcome it reached, the alignment score, and the output of each compiler stage.</li>
+        <li><strong>Study progress:</strong> which study resources you marked as done, and when.</li>
         <li><strong>Pathways you build:</strong> the name, topic, outcomes and rules you save in the pathway builder.</li>
       </ul>
 
@@ -27,8 +28,8 @@ export default function PrivacyPage() {
         Everything above lives in the MongoDB database configured for the backend. Your answers are also sent to the
         project’s own ML service, which computes mastery and returns it; that service keeps nothing. Programs you type
         into the playground or pathway builder simulation are compiled on the backend server and deleted after the
-        run. Only the programs generated from your own quiz results, on the dashboard or results page, are saved as
-        compiler decisions.
+        run. Only the programs generated from your own quiz results, on the dashboard, the results page or a study page, are
+        saved as compiler decisions.
       </p>
 
       <h2>In your browser</h2>
@@ -42,6 +43,10 @@ export default function PrivacyPage() {
       <ul>
         <li>There is no analytics, advertising or tracking code.</li>
         <li>Fonts are served from this site, so no font provider sees your visit.</li>
+        <li>
+          Study pages link to outside sites such as YouTube, LeetCode and VisuAlgo but do not embed them, so those
+          sites see nothing until you open a link. Once you do, their own privacy policies apply.
+        </li>
         <li>Your data is not sold or shared with anyone.</li>
       </ul>
 

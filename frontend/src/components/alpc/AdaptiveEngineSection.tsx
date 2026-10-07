@@ -61,6 +61,9 @@ export function AdaptiveEngineSection({ skill, performance, mastery }: Props) {
             {showTrace ? 'Hide compiler trace' : 'Show compiler trace'}
           </button>
         )}
+        {result?.decisionId && (
+          <Link href={`/history/${result.decisionId}`} className="btn btn-quiet btn-sm">Why this?</Link>
+        )}
         <Link href="/compiler" className="btn btn-quiet btn-sm">Open the playground</Link>
       </div>
 

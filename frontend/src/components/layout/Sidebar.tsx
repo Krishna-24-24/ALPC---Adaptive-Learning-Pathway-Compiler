@@ -11,8 +11,10 @@ const GROUPS = [
     label: 'Learning',
     items: [
       { href: '/dashboard', label: 'Dashboard' },
+      { href: '/study', label: 'Study' },
       { href: '/quiz/adaptive', label: 'Practice quiz' },
       { href: '/quiz/diagnostic', label: 'Diagnostic' },
+      { href: '/history', label: 'Decision history' },
     ],
   },
   {

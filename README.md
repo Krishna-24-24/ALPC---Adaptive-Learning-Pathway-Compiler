@@ -23,6 +23,8 @@ Everything is self-contained in this single project directory (the repo root, `A
 ALPC/
 ├── backend/                  # Express.js REST API & ALPC Compiler Bridge
 │   ├── src/routes/alpc.js    # Compiler playground & pathway generation endpoints
+│   ├── src/routes/study.js   # Study pages: resources chosen by the compiled outcome
+│   ├── src/data/resources.json # Study links per topic and level (edit freely)
 │   ├── src/services/alpcRunner.js # Executes alpc.exe & lli.exe
 │   ├── src/models/           # Pathway & CompilerDecision models
 │   └── .env                  # Port 5000, MongoDB, ALPC_BIN configuration
@@ -31,6 +33,8 @@ ALPC/
 │   ├── src/app/compiler/     # ALPC Compiler Playground (/compiler)
 │   ├── src/app/pathway-builder/ # Adaptive Pathway Builder & Simulator (/pathway-builder)
 │   ├── src/app/dashboard/    # Student Dashboard + Adaptive Engine Card (/dashboard)
+│   ├── src/app/study/        # Study pages per topic (/study, /study/[topic])
+│   ├── src/app/history/      # Decision history and "Why this?" pages (/history)
 │   └── src/app/quiz/results/ # Assessment Results + ALPC Decision Card
 │
 ├── ml-service/               # FastAPI Python Psychometrics Engine (BKT & IRT 1PL)
@@ -70,7 +74,7 @@ Open your terminals in the repo root (the folder you cloned, e.g. `cd ALPC`).
 3. Build and test the compiler (still in MSYS2 MINGW64, from the repo root):
    ```bash
    make
-   make check        # pass=95 fail=0
+   make check        # pass=97 fail=0
    ```
    `npm run build:compiler` (build.bat) also works from PowerShell; it picks up MSYS2
    from `C:\msys64` automatically.
@@ -114,7 +118,8 @@ All commands run from the repo root:
 
 | Command | Action |
 |---|---|
-| `npm test` | Runs the PRD Section 33 integration suite (14 tests; the 6 end-to-end ones run the real `alpc.exe` + `lli`, so rebuild the compiler first). |
+| `npm test` | Runs the PRD Section 33 integration suite and the study-page tests (27 tests; the end-to-end ones run the real `alpc.exe` + `lli`, so rebuild the compiler first). |
+| `npm run setup:ml` | Creates `ml-service/venv` and installs the ML service's requirements. |
 | `npm run seed` | Seeds the MongoDB database with initial DSA skills and questions. |
 | `npm run demo:compiler` | Runs the full 5-stage compiler pipeline demo on `examples/pathway.edu`. |
 | `npm run build:compiler` | Recompiles `alpc.exe` using Flex, Bison, and g++ (takes ~3s). |
@@ -143,6 +148,15 @@ With the services running, open **`http://localhost:3000`** in your browser:
    - Practice assessment with questions matched to mastery.
    - On completion, results automatically trigger ALPC to compile a personalized multi-step study plan.
 
+5. **[Study](http://localhost:3000/study)** (`/study`):
+   - One page per topic with videos, articles, visualisations and problem sets.
+   - The outcome your compiled pathway program prints picks the level: `remedial` shows introductions, `practice` introductions and practice, `core` practice and core material, `advanced` core and harder material. The rest stays one click away.
+   - Mark resources as done; progress is saved to your account. The decision is compiled again when your mastery for the topic changes.
+   - Links live in `backend/src/data/resources.json`. Edits are picked up without a restart; `npm test` checks the file and rejects links on hosts nobody has checked.
+
+6. **[Decision history](http://localhost:3000/history)** (`/history`):
+   - Every compiler decision made for you. **Why this?** opens the program, the rule that was taken, each compiler stage, and what the program printed.
+
 ---
 
 ## 🧪 Verification & Acceptance Tests
@@ -154,29 +168,7 @@ cd ALPC
 npm test
 ```
 
-**Results:**
-```
-========================================
- ALPC + LearnSmart Integration Tests
-========================================
-
-  ✓ Test 1: Student score 40 maps to REMEDIAL outcome
-  ✓ Test 2: Student score 65 maps to PRACTICE/CORE outcome
-  ✓ Test 3: Student score 90 maps to ADVANCED outcome
-  ✓ Test 4: Rule referencing undeclared outcome detected
-  ✓ Test 5: Backward Design — OUTCOME declared before SET & IF
-  ✓ Test 6: Token parsing handles keywords, identifiers, and literals
-  ✓ Test 7: AST parser constructs hierarchical tree from dump-ast
-  ✓ Test 8: Binary output (; b) parsing
-  ✓ Run output: decimal score made of 0s and 1s is not read as binary
-  ✓ E2E: default pathway compiles and runs (score 40)
-  ✓ E2E: default pathway compiles and runs (score 65)
-  ✓ E2E: default pathway compiles and runs (score 90)
-  ✓ E2E: Alignment Score comes from execution (state += 15, and ; b)
-  ✓ E2E: unknown outcome is rejected with line and column
-
-Results: 14 passed, 0 failed.
-```
+It prints one line per test and ends with `Results: N passed, 0 failed.` for each suite. The outcome in every end-to-end test is read from what the compiled program prints, not recomputed in JavaScript.
 
 The E2E tests use `ALPC_BIN` / `LLI_BIN` (same variables as the backend) and are skipped
 when the compiler binary is not found.
