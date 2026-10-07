@@ -30,7 +30,13 @@ enum NodeKind {
   NK_ProfileSet,
   NK_CondBranch,
   NK_Outcome,
+  // Condition nodes: the test inside an IF, never a statement on their own.
+  NK_Compare,
+  NK_Logical,
 };
+
+enum LogicOp { LOGIC_AND = 0, LOGIC_OR = 1 };
+const char *logic_op_str(LogicOp op);  // "AND", "OR"
 
 class ASTNode {
  public:
@@ -71,28 +77,68 @@ class ProfileSet final : public ASTNode {
   const int value;
 };
 
-// IF <var> <rel> <value> GOTO <target>
-class CondBranch final : public ASTNode {
+// <var> <rel> <value>, one comparison inside a condition.
+class Compare final : public ASTNode {
  public:
-  // `col` locates the condition variable, `target_col` the GOTO target.
-  CondBranch(int line, std::string var, RelOp rel, int value, std::string target,
-             int col = 0, int target_col = 0)
-      : ASTNode(NK_CondBranch, line, col),
-        var(std::move(var)),
-        rel(rel),
-        value(value),
-        target(std::move(target)),
-        target_col(target_col) {}
+  Compare(int line, std::string var, RelOp rel, int value, int col = 0)
+      : ASTNode(NK_Compare, line, col), var(std::move(var)), rel(rel), value(value) {}
 
-  static bool classof(const ASTNode *n) { return n->kind() == NK_CondBranch; }
-  void print(std::ostream &os) const override;
+  static bool classof(const ASTNode *n) { return n->kind() == NK_Compare; }
+  void print(std::ostream &os) const override;  // "perf < 70"
 
   const std::string var;
   const RelOp rel;
   const int value;
+};
+
+// <lhs> AND <rhs> | <lhs> OR <rhs>. AND binds tighter than OR; both are
+// short-circuit and left-associative.
+class Logical final : public ASTNode {
+ public:
+  Logical(int line, LogicOp op, std::unique_ptr<ASTNode> lhs, std::unique_ptr<ASTNode> rhs,
+          int col = 0)
+      : ASTNode(NK_Logical, line, col), op(op), lhs(std::move(lhs)), rhs(std::move(rhs)) {}
+
+  static bool classof(const ASTNode *n) { return n->kind() == NK_Logical; }
+  void print(std::ostream &os) const override;  // "(a < 1 AND b > 2)"
+
+  const LogicOp op;
+  const std::unique_ptr<ASTNode> lhs;  // Compare or Logical
+  const std::unique_ptr<ASTNode> rhs;
+};
+
+// IF <condition> GOTO <target>
+class CondBranch final : public ASTNode {
+ public:
+  // `cond` is a Compare or a Logical tree; the node's column is the first
+  // condition variable, `target_col` the GOTO target.
+  CondBranch(int line, std::unique_ptr<ASTNode> cond, std::string target, int col = 0,
+             int target_col = 0)
+      : ASTNode(NK_CondBranch, line, col),
+        cond(std::move(cond)),
+        target(std::move(target)),
+        target_col(target_col) {}
+
+  // IF <var> <rel> <value> GOTO <target>: the common single-comparison form.
+  CondBranch(int line, std::string var, RelOp rel, int value, std::string target,
+             int col = 0, int target_col = 0)
+      : CondBranch(line, std::make_unique<Compare>(line, std::move(var), rel, value, col),
+                   std::move(target), col, target_col) {}
+
+  static bool classof(const ASTNode *n) { return n->kind() == NK_CondBranch; }
+  void print(std::ostream &os) const override;
+
+  // The comparison when the condition is a single one, else nullptr.
+  const Compare *simple() const;
+
+  const std::unique_ptr<ASTNode> cond;
   const std::string target;
   const int target_col;
 };
+
+// Calls f(const Compare&) for every comparison in a condition, left to right.
+template <class F>
+void for_each_compare(const ASTNode *cond, F &&f);
 
 // OUTCOME <name> [ += n | -= n ]
 // `adjust` is the signed amount applied to `state` when a GOTO reaches this
@@ -124,6 +170,16 @@ template <class T>
 const T *cast(const ASTNode *n) {
   assert(isa<T>(n) && "alpc::cast<> on the wrong NodeKind");
   return static_cast<const T *>(n);
+}
+
+template <class F>
+void for_each_compare(const ASTNode *cond, F &&f) {
+  if (const auto *c = dyn_cast<Compare>(cond)) {
+    f(*c);
+  } else if (const auto *l = dyn_cast<Logical>(cond)) {
+    for_each_compare(l->lhs.get(), f);
+    for_each_compare(l->rhs.get(), f);
+  }
 }
 
 // The whole compiled program. Owns its statements; no cross-links, so no cycles.

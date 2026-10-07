@@ -1,0 +1,12 @@
+# AND binds tighter than OR; parentheses group.
+OUTCOME remedial;
+OUTCOME core;
+OUTCOME advanced;
+
+SET performance = 62;
+SET mastery = 35;
+SET state = 62;
+
+IF performance < 50 OR mastery < 30 GOTO remedial;
+IF performance >= 85 AND mastery >= 70 GOTO advanced;
+IF (performance < 70 OR mastery < 40) AND performance >= 50 GOTO core;

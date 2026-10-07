@@ -90,6 +90,21 @@ std::vector<std::string> split_lines(const std::string &text) {
   return lines;
 }
 
+// {"var","rel","value","col"} for a comparison, {"op","lhs","rhs"} for AND/OR.
+void json_cond(std::ostream &os, const alpc::ASTNode *n) {
+  if (const auto *c = alpc::dyn_cast<alpc::Compare>(n)) {
+    os << "{\"var\":" << jstr(c->var) << ",\"rel\":" << jstr(alpc::rel_op_str(c->rel))
+       << ",\"value\":" << c->value << ",\"line\":" << c->line() << ",\"col\":" << c->col()
+       << "}";
+  } else if (const auto *l = alpc::dyn_cast<alpc::Logical>(n)) {
+    os << "{\"op\":" << jstr(alpc::logic_op_str(l->op)) << ",\"lhs\":";
+    json_cond(os, l->lhs.get());
+    os << ",\"rhs\":";
+    json_cond(os, l->rhs.get());
+    os << "}";
+  }
+}
+
 void json_stmt(std::ostream &os, const alpc::ASTNode *n) {
   os << "{";
   if (const auto *s = alpc::dyn_cast<alpc::ProfileSet>(n)) {
@@ -97,11 +112,14 @@ void json_stmt(std::ostream &os, const alpc::ASTNode *n) {
        << s->col() << ",\"name\":" << jstr(s->name) << ",\"op\":"
        << jstr(alpc::set_op_str(s->op)) << ",\"value\":" << s->value;
   } else if (const auto *b = alpc::dyn_cast<alpc::CondBranch>(n)) {
-    os << "\"kind\":\"CondBranch\",\"line\":" << b->line() << ",\"col\":"
-       << b->col() << ",\"var\":" << jstr(b->var) << ",\"rel\":"
-       << jstr(alpc::rel_op_str(b->rel)) << ",\"value\":" << b->value
-       << ",\"target\":" << jstr(b->target) << ",\"targetCol\":"
-       << b->target_col;
+    os << "\"kind\":\"CondBranch\",\"line\":" << b->line() << ",\"col\":" << b->col();
+    if (const alpc::Compare *c = b->simple()) {  // single comparison: flat fields, as before
+      os << ",\"var\":" << jstr(c->var) << ",\"rel\":" << jstr(alpc::rel_op_str(c->rel))
+         << ",\"value\":" << c->value;
+    }
+    os << ",\"cond\":";
+    json_cond(os, b->cond.get());
+    os << ",\"target\":" << jstr(b->target) << ",\"targetCol\":" << b->target_col;
   } else if (const auto *o = alpc::dyn_cast<alpc::Outcome>(n)) {
     os << "\"kind\":\"Outcome\",\"line\":" << o->line() << ",\"col\":"
        << o->col() << ",\"name\":" << jstr(o->name) << ",\"adjust\":"

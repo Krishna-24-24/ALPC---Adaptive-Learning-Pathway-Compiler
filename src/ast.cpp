@@ -21,15 +21,38 @@ const char *rel_op_str(RelOp op) {
   }
 }
 
+const char *logic_op_str(LogicOp op) { return op == LOGIC_OR ? "OR" : "AND"; }
+
+void Compare::print(std::ostream &os) const {
+  os << var << " " << rel_op_str(rel) << " " << value;
+}
+
+void Logical::print(std::ostream &os) const {
+  os << "(";
+  lhs->print(os);
+  os << " " << logic_op_str(op) << " ";
+  rhs->print(os);
+  os << ")";
+}
+
+const Compare *CondBranch::simple() const { return dyn_cast<Compare>(cond.get()); }
+
 void ProfileSet::print(std::ostream &os) const {
   os << "ProfileSet  line=" << line() << "  name=\"" << name << "\" op=\""
      << set_op_str(op) << "\" value=" << value;
 }
 
 void CondBranch::print(std::ostream &os) const {
-  os << "CondBranch  line=" << line() << "  var=\"" << var << "\" rel=\""
-     << rel_op_str(rel) << "\" value=" << value << " target=\"" << target
-     << "\"";
+  // A single comparison keeps the original var/rel/value form.
+  if (const Compare *c = simple()) {
+    os << "CondBranch  line=" << line() << "  var=\"" << c->var << "\" rel=\""
+       << rel_op_str(c->rel) << "\" value=" << c->value << " target=\"" << target
+       << "\"";
+  } else {
+    os << "CondBranch  line=" << line() << "  cond=\"";
+    cond->print(os);
+    os << "\" target=\"" << target << "\"";
+  }
 }
 
 void Outcome::print(std::ostream &os) const {
@@ -53,8 +76,9 @@ void print_trace(std::ostream &os, const Program &p) {
       os << "set " << s->name << " " << set_op_str(s->op) << " " << s->value
          << "\n";
     } else if (const auto *b = dyn_cast<CondBranch>(stmt.get())) {
-      os << "branch " << b->var << " " << rel_op_str(b->rel) << " " << b->value
-         << " -> " << b->target << "\n";
+      os << "branch ";
+      if (const Compare *c = b->simple()) c->print(os); else b->cond->print(os);
+      os << " -> " << b->target << "\n";
     } else if (const auto *o = dyn_cast<Outcome>(stmt.get())) {
       os << "outcome " << o->name;
       if (o->adjust > 0) os << " += " << o->adjust;

@@ -1,0 +1,9 @@
+outcome remedial
+outcome core
+outcome advanced
+set performance = 62
+set mastery = 35
+set state = 62
+branch (performance < 50 OR mastery < 30) -> remedial
+branch (performance >= 85 AND mastery >= 70) -> advanced
+branch ((performance < 70 OR mastery < 40) AND performance >= 50) -> core

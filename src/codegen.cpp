@@ -21,6 +21,30 @@ const char *pred_of(RelOp rel) {
   }
 }
 
+// Lowers a condition with short-circuit control flow: branches to `on_true`
+// as soon as the result is known true, to `on_false` as soon as it is known
+// false. A single comparison is one icmp + br, exactly as before AND/OR.
+void emit_cond(std::ostream &out, const ASTNode *cond, const std::string &on_true,
+               const std::string &on_false, int &op_ctr) {
+  if (const auto *c = dyn_cast<Compare>(cond)) {
+    int id = op_ctr++;
+    out << "  %" << c->var << ".val." << id << " = load i32, ptr %" << c->var << "\n";
+    out << "  %cond." << id << " = icmp " << pred_of(c->rel) << " i32 %" << c->var << ".val."
+        << id << ", " << c->value << "\n";
+    out << "  br i1 %cond." << id << ", label %" << on_true << ", label %" << on_false << "\n\n";
+  } else if (const auto *l = dyn_cast<Logical>(cond)) {
+    // AND: a false left side decides it; OR: a true left side decides it.
+    const std::string rhs = (l->op == LOGIC_AND ? "and.rhs." : "or.rhs.") + std::to_string(op_ctr++);
+    if (l->op == LOGIC_AND) {
+      emit_cond(out, l->lhs.get(), rhs, on_false, op_ctr);
+    } else {
+      emit_cond(out, l->lhs.get(), on_true, rhs, op_ctr);
+    }
+    out << rhs << ":\n";
+    emit_cond(out, l->rhs.get(), on_true, on_false, op_ctr);
+  }
+}
+
 }  // namespace
 
 std::string emit_ir(const Program &p, const std::string &module_name, bool &ok) {
@@ -88,7 +112,9 @@ std::string emit_ir(const Program &p, const std::string &module_name, bool &ok) 
   vars.insert("state");
   for (const auto &s : p.stmts) {
     if (const auto *ps = dyn_cast<ProfileSet>(s.get())) vars.insert(ps->name);
-    if (const auto *cb = dyn_cast<CondBranch>(s.get())) vars.insert(cb->var);
+    if (const auto *cb = dyn_cast<CondBranch>(s.get())) {
+      for_each_compare(cb->cond.get(), [&](const Compare &c) { vars.insert(c.var); });
+    }
   }
 
   for (const auto &v : vars) {
@@ -111,12 +137,10 @@ std::string emit_ir(const Program &p, const std::string &module_name, bool &ok) 
         out << "  store i32 %fusion." << id << ", ptr %" << ps->name << "\n";
       }
     } else if (const auto *cb = dyn_cast<CondBranch>(s.get())) {
-      int id = op_ctr++;
-      out << "  %" << cb->var << ".val." << id << " = load i32, ptr %" << cb->var << "\n";
-      out << "  %cond." << id << " = icmp " << pred_of(cb->rel) << " i32 %" << cb->var << ".val." << id << ", " << cb->value << "\n";
       int after_id = cont_ctr++;
-      out << "  br i1 %cond." << id << ", label %outcome." << cb->target << ", label %after" << after_id << "\n\n";
-      out << "after" << after_id << ":\n";
+      const std::string after = "after" + std::to_string(after_id);
+      emit_cond(out, cb->cond.get(), "outcome." + cb->target, after, op_ctr);
+      out << after << ":\n";
     }
   }
 
