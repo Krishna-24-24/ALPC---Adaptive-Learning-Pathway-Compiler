@@ -8,3 +8,8 @@ __pycache__/
 .venv/
 venv/
 .DS_Store
+
+obj/t/
+obj/san/
+obj/tmp/
+obj/pathway.*
