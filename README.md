@@ -68,7 +68,7 @@ docs/           architecture, API, demo script, decision records
 1. **Compiler toolchain.** Install [MSYS2](https://www.msys2.org), then in the
    *MSYS2 MINGW64* terminal:
    ```bash
-   pacman -S --needed make flex bison mingw-w64-x86_64-gcc mingw-w64-x86_64-llvm
+   pacman -S --needed make flex bison diffutils mingw-w64-x86_64-gcc mingw-w64-x86_64-llvm
    ```
 2. **Build the compiler** from the repo root, in that terminal:
    ```bash
