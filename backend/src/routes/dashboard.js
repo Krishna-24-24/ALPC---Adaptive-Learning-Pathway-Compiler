@@ -1,9 +1,11 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const Mastery = require('../models/Mastery');
 const Attempt = require('../models/Attempt');
 const Recommendation = require('../models/Recommendation');
 const { authMiddleware } = require('../middleware/auth');
 const mlService = require('../services/mlService');
+const { dueForReview } = require('../services/review');
 
 const router = express.Router();
 
@@ -32,9 +34,16 @@ router.get('/dashboard', authMiddleware, async (req, res) => {
       updatedAt: r.updatedAt,
     }));
 
+    const last = await Attempt.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(req.user.id) } },
+      { $group: { _id: '$skill', at: { $max: '$timestamp' } } },
+    ]);
+    const review = dueForReview(masteryRecords, Object.fromEntries(last.map(l => [l._id, l.at])));
+
     res.json({
       skills,
       masteryMap,
+      review,
       weakestSkills: analytics.weakestSkills,
       learningPath: analytics.learningPath,
       nextTopic,

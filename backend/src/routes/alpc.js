@@ -7,6 +7,11 @@ const { authMiddleware } = require('../middleware/auth');
 const alpcRunner         = require('../services/alpcRunner');
 const { generateForStudent, generatePathLang, validate } = require('../services/pathwayGenerator');
 const { decide } = require('../services/decide');
+const { rateLimit } = require('../middleware/rateLimit');
+
+// Public routes that run the compiler: limit each client.
+const compileLimit = rateLimit({ windowMs: 60_000, max: Number(process.env.COMPILE_PER_MINUTE) || 30, name: 'compile' });
+const checkLimit   = rateLimit({ windowMs: 60_000, max: Number(process.env.CHECK_PER_MINUTE) || 150, name: 'check' });
 
 const router = express.Router();
 
@@ -86,22 +91,22 @@ function payload(result, extra = {}) {
 
 // ─── POST /api/alpc/compile ──────────────────────────────────────────────────
 // Compile and run raw Path-Lang source. No auth required (playground).
-router.post('/compile', async (req, res) => {
+router.post('/compile', compileLimit, async (req, res) => {
   try {
     const { source } = req.body;
     if (typeof source !== 'string' || !source.trim()) {
       return res.status(400).json({ error: '"source" string is required' });
     }
-    return res.json(payload(await alpcRunner.compile(source)));
+    return res.json(payload(await alpcRunner.compile(source, { optimize: true })));
   } catch (err) {
-    console.error('[alpc/compile]', err.message);
-    return res.status(500).json({ error: err.message });
+    if (!err.status) console.error('[alpc/compile]', err.message);
+    return res.status(err.status || 500).json({ error: err.message });
   }
 });
 
 // ─── POST /api/alpc/check ────────────────────────────────────────────────────
 // Compile only, no execution: diagnostics with line and column for the editor.
-router.post('/check', async (req, res) => {
+router.post('/check', checkLimit, async (req, res) => {
   try {
     const { source } = req.body;
     if (typeof source !== 'string') {
@@ -110,7 +115,7 @@ router.post('/check', async (req, res) => {
     if (!source.trim()) return res.json({ success: true, diagnostics: [], backwardDesign: null });
     return res.json(await alpcRunner.check(source));
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    return res.status(err.status || 500).json({ error: err.message });
   }
 });
 

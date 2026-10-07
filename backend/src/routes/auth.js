@@ -2,7 +2,12 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Mastery = require('../models/Mastery');
-const { signToken } = require('../middleware/auth');
+const Attempt = require('../models/Attempt');
+const Recommendation = require('../models/Recommendation');
+const CompilerDecision = require('../models/CompilerDecision');
+const StudyProgress = require('../models/StudyProgress');
+const Pathway = require('../models/Pathway');
+const { signToken, authMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -32,7 +37,7 @@ router.post('/register', async (req, res) => {
 
     const existing = await User.findOne({ email: email.toLowerCase() });
     if (existing) {
-      return res.status(409).json({ error: 'Email already registered' });
+      return res.status(409).json({ error: 'An account with this email already exists.', code: 'EMAIL_TAKEN' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -81,6 +86,39 @@ router.post('/login', async (req, res) => {
         diagnosticCompleted: user.diagnosticCompleted,
       },
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/auth/account  { password }
+// Removes the account and everything stored for it. Needs the password again,
+// so a token left in a shared browser is not enough to wipe an account.
+router.delete('/account', authMiddleware, async (req, res) => {
+  try {
+    const { password } = req.body || {};
+    if (!password) return res.status(400).json({ error: 'Enter your password to delete your account.' });
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'This account no longer exists.' });
+    if (!(await bcrypt.compare(password, user.passwordHash))) {
+      return res.status(401).json({ error: 'That password is not correct.' });
+    }
+
+    const userId = user._id;
+    const removed = {};
+    for (const [name, Model, filter] of [
+      ['attempts', Attempt, { userId }],
+      ['mastery', Mastery, { userId }],
+      ['recommendations', Recommendation, { userId }],
+      ['decisions', CompilerDecision, { userId }],
+      ['studyProgress', StudyProgress, { userId }],
+      ['pathways', Pathway, { createdBy: userId }],
+    ]) {
+      removed[name] = (await Model.deleteMany(filter)).deletedCount;
+    }
+    await User.deleteOne({ _id: userId });
+    res.json({ deleted: true, removed });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

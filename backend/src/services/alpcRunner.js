@@ -19,6 +19,7 @@ const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 const ALPC_BIN = process.env.ALPC_BIN
   || path.join(REPO_ROOT, process.platform === 'win32' ? 'alpc.exe' : 'alpc');
 const LLI_BIN  = process.env.LLI_BIN  || 'lli';
+const OPT_BIN  = process.env.OPT_BIN  || 'opt';
 const MSYS_MINGW_BIN = process.env.MSYS_MINGW_BIN || 'C:/msys64/mingw64/bin';
 const MSYS_USR_BIN   = process.env.MSYS_USR_BIN   || 'C:/msys64/usr/bin';
 
@@ -85,10 +86,19 @@ function parseRunOutput(stdout, binaryMode) {
 const DIAG_STAGE = { lexical: 'tokens', syntax: 'parse', semantic: 'parse' };
 
 /** `alpc --dump-ast`-style label for one AST node from the --json output. */
+/** A condition tree from --json as source text: "(a < 1 OR b > 2)". */
+function condText(c) {
+  if (!c) return '';
+  if (c.op) return `(${condText(c.lhs)} ${c.op} ${condText(c.rhs)})`;
+  return `${c.var} ${c.rel} ${c.value}`;
+}
+
 function astLabel(node) {
   const fields = Object.entries(node)
-    .filter(([k]) => !['kind', 'col', 'targetCol'].includes(k))
+    .filter(([k]) => !['kind', 'col', 'targetCol', 'cond'].includes(k))
     .map(([k, v]) => (typeof v === 'string' ? `${k}="${v}"` : `${k}=${v}`));
+  // A compound condition has no flat var/rel/value, so show the whole tree.
+  if (node.cond && node.cond.op) fields.splice(1, 0, `cond="${condText(node.cond)}"`);
   return `${node.kind}  ${fields.join('  ')}`;
 }
 
@@ -122,9 +132,7 @@ function diagnosticsOf(json) {
 
 /** Compile only: tokens, trace, AST, diagnostics, IR. Fast enough to run while typing. */
 async function check(source) {
-  if (Buffer.byteLength(source, 'utf8') > MAX_SOURCE_BYTES) {
-    throw new Error(`Source too large (max ${MAX_SOURCE_BYTES} bytes)`);
-  }
+  tooLarge(source);
   const workDir = await mkdtemp(path.join(tmpdir(), 'alpc-ls-'));
   try {
     const { json, error } = await runCompiler(source, workDir);
@@ -139,15 +147,37 @@ async function check(source) {
  * Compile a Path-Lang program with ALPC and run it with lli.
  * Returns everything the frontend shows, all of it produced by the two tools.
  */
-async function compile(source) {
+function tooLarge(source) {
   if (Buffer.byteLength(source, 'utf8') > MAX_SOURCE_BYTES) {
-    throw new Error(`Source too large (max ${MAX_SOURCE_BYTES} bytes)`);
+    const err = new Error(`The program is too long. The limit is ${MAX_SOURCE_BYTES / 1024} KB.`);
+    err.status = 413;
+    throw err;
   }
+}
+
+/**
+ * Runs LLVM's own optimizer (opt -O2) on the generated IR. Because every SET
+ * is a constant, it usually folds the whole program into one print of the
+ * score and one of the outcome. Returns { ir } or { error }.
+ */
+async function optimize(ir, workDir) {
+  await writeFile(path.join(workDir, 'opt-in.ll'), ir, 'utf8');
+  const res = await runBin(OPT_BIN, ['-O2', '-S', 'opt-in.ll', '-o', '-'], workDir);
+  if (res.exitCode === 127) {
+    return { error: `The LLVM optimizer was not found: "${OPT_BIN}". It ships with LLVM next to lli; set OPT_BIN in backend/.env if it lives elsewhere.` };
+  }
+  if (res.exitCode !== 0) return { error: res.stderr.trim() || `opt exited with ${res.exitCode}.` };
+  return { ir: res.stdout };
+}
+
+async function compile(source, { optimize: withOptimizer = false } = {}) {
+  tooLarge(source);
 
   const workDir = await mkdtemp(path.join(tmpdir(), 'alpc-ls-'));
   const result = {
     success: false, outcome: null, alignmentScore: null, binaryOutput: null,
     tokens: [], traceLines: [], ast: null, irSource: '', stages: [], diagnostics: [], backwardDesign: null,
+    optimizedIr: null, optimizeError: null,
   };
   const stage = (id, status, stdout = '', stderr = '', exitCode = null) =>
     result.stages.push({ id, status, stdout, stderr, exitCode });
@@ -199,6 +229,12 @@ async function compile(source) {
     const runOk = run.signal === null && run.exitCode !== 127 && parsed.alignmentScore !== null && parsed.reportedOutcome;
     stage('run', runOk ? 'success' : 'error', run.stdout, runOk ? '' : (run.stderr || 'The program did not print a score and an outcome. Rebuild the compiler so it reports the outcome.'), run.exitCode);
 
+    if (runOk && withOptimizer) {
+      const o = await optimize(result.irSource, workDir);
+      result.optimizedIr = o.ir ?? null;
+      result.optimizeError = o.error ?? null;
+    }
+
     if (runOk) {
       result.success = true;
       result.alignmentScore = parsed.alignmentScore;
@@ -213,4 +249,4 @@ async function compile(source) {
   }
 }
 
-module.exports = { compile, check, parseRunOutput };
+module.exports = { compile, check, parseRunOutput, condText, MAX_SOURCE_BYTES };
