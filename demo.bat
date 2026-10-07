@@ -6,7 +6,10 @@ echo  ALPC Compiler Demonstration Walkthrough
 echo  Program: examples\pathway.edu
 echo ========================================
 
-set "LLI=C:\Program Files\CodeBlocks\MinGW\bin\lli.exe"
+rem lli: LLI_BIN if set, else MSYS2's, else whatever is on PATH.
+if not defined MSYS2_ROOT set "MSYS2_ROOT=C:\msys64"
+if exist "%MSYS2_ROOT%\mingw64\bin\lli.exe" set "PATH=%MSYS2_ROOT%\mingw64\bin;%PATH%"
+if defined LLI_BIN (set "LLI=%LLI_BIN%") else (set "LLI=lli")
 
 echo.
 echo [1] Path-Lang Source:

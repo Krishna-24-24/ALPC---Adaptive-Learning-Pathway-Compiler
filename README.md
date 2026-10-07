@@ -17,7 +17,7 @@
 
 ## 📌 Unified Project Layout (Single Root: `ALPC/`)
 
-Everything is self-contained in this single project directory (`C:\Users\Krishna\Projects\ALPC`). All build commands, backend services, frontend services, and ML engines run directly from here.
+Everything is self-contained in this single project directory (the repo root, `ALPC/`). All build commands, backend services, frontend services, and ML engines run directly from here.
 
 ```
 ALPC/
@@ -57,12 +57,31 @@ ALPC/
 
 ## 🚀 How to Run in Local (All from `ALPC`)
 
-Open your terminals directly in **`C:\Users\Krishna\Projects\ALPC`**.
+Open your terminals in the repo root (the folder you cloned, e.g. `cd ALPC`).
+
+### 🔧 One-time setup: compiler toolchain (Windows)
+
+1. Install [MSYS2](https://www.msys2.org) (default folder `C:\msys64`).
+2. In the **MSYS2 MINGW64** terminal:
+   ```bash
+   pacman -Syu
+   pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-llvm flex bison make python
+   ```
+3. Build and test the compiler (still in MSYS2 MINGW64, from the repo root):
+   ```bash
+   make
+   make check        # pass=95 fail=0
+   ```
+   `npm run build:compiler` (build.bat) also works from PowerShell; it picks up MSYS2
+   from `C:\msys64` automatically.
+4. Copy `backend/.env.example` to `backend/.env`. `ALPC_BIN` defaults to `alpc.exe`
+   in the repo root and `LLI_BIN` to `lli` on PATH; set them there only if yours live
+   elsewhere (e.g. `LLI_BIN=C:/msys64/mingw64/bin/lli.exe`).
 
 ### 🟢 Terminal 1: Express Backend (Port 5000)
 
 ```powershell
-cd C:\Users\Krishna\Projects\ALPC
+cd ALPC
 npm run dev:backend
 ```
 > Starts the Express backend on `http://localhost:5000`. Connects to MongoDB and shells out directly to `alpc.exe`.
@@ -72,7 +91,7 @@ npm run dev:backend
 ### 🟢 Terminal 2: Python ML Engine (Port 8000)
 
 ```powershell
-cd C:\Users\Krishna\Projects\ALPC
+cd ALPC
 npm run dev:ml
 ```
 > Starts the FastAPI psychometrics engine on `http://localhost:8000` with Bayesian Knowledge Tracing (BKT) and Item Response Theory (IRT).
@@ -82,7 +101,7 @@ npm run dev:ml
 ### 🟢 Terminal 3: Next.js Frontend (Port 3000)
 
 ```powershell
-cd C:\Users\Krishna\Projects\ALPC
+cd ALPC
 npm run dev:frontend
 ```
 > Starts the Next.js 15 web UI on `http://localhost:3000`.
@@ -91,7 +110,7 @@ npm run dev:frontend
 
 ## ⚡ Useful One-Click CLI Commands (Run from `ALPC`)
 
-All commands run directly in `C:\Users\Krishna\Projects\ALPC`:
+All commands run from the repo root:
 
 | Command | Action |
 |---|---|
@@ -131,7 +150,7 @@ With the services running, open **`http://localhost:3000`** in your browser:
 Run the integration test suite:
 
 ```powershell
-cd C:\Users\Krishna\Projects\ALPC
+cd ALPC
 npm test
 ```
 

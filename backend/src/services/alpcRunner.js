@@ -8,7 +8,11 @@ const path = require('path');
 
 const execFileAsync = promisify(execFile);
 
-const ALPC_BIN = process.env.ALPC_BIN || 'C:/Users/Krishna/Projects/ALPC/alpc.exe';
+// Default: the compiler built at the repo root (`make` / build.bat). Override
+// with ALPC_BIN / LLI_BIN in backend/.env when the binaries live elsewhere.
+const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
+const ALPC_BIN = process.env.ALPC_BIN
+  || path.join(REPO_ROOT, process.platform === 'win32' ? 'alpc.exe' : 'alpc');
 const LLI_BIN  = process.env.LLI_BIN  || 'lli';
 const MSYS_MINGW_BIN = process.env.MSYS_MINGW_BIN || 'C:/msys64/mingw64/bin';
 const MSYS_USR_BIN   = process.env.MSYS_USR_BIN   || 'C:/msys64/usr/bin';
@@ -38,7 +42,9 @@ async function runBin(bin, args, cwd) {
     if (err.code === 'ENOENT') {
       return {
         stdout: '',
-        stderr: `Compiler binary not found: "${bin}". Build ALPC first (make) or configure ALPC_BIN in backend/.env.`,
+        stderr: bin === LLI_BIN
+          ? `LLVM interpreter not found: "${bin}". Install LLVM (MSYS2: pacman -S mingw-w64-x86_64-llvm) or set LLI_BIN in backend/.env.`
+          : `Compiler binary not found: "${bin}". Build ALPC first (make or build.bat) or set ALPC_BIN in backend/.env.`,
         exitCode: 127,
         signal: null,
       };

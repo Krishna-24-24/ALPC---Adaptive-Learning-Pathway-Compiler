@@ -15,6 +15,12 @@
 
 const assert = require('assert');
 const fs = require('fs');
+const path = require('path');
+
+// Use the same ALPC_BIN / LLI_BIN the backend uses (backend/.env), if present.
+try {
+  require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
+} catch (_) { /* dotenv not installed (no `npm install` in backend): env vars only */ }
 const { generatePathLang, generateForStudent, validate } = require('../services/pathwayGenerator');
 const { deriveOutcome, parseTokens, parseAst, parseCompilerResult } = require('../services/resultParser');
 const { compile, parseRunOutput } = require('../services/alpcRunner');
@@ -178,7 +184,8 @@ async function main() {
   // ── End-to-end against the real compiler ─────────────────────────────────
   // These invoke ALPC + lli instead of mocks. Point ALPC_BIN (and LLI_BIN) at
   // a built compiler; skipped when the binary is not present.
-  const alpcBin = process.env.ALPC_BIN || 'C:/Users/Krishna/Projects/ALPC/alpc.exe';
+  const alpcBin = process.env.ALPC_BIN || path.join(__dirname, '..', '..', '..',
+    process.platform === 'win32' ? 'alpc.exe' : 'alpc');
   if (!fs.existsSync(alpcBin)) {
     console.log(`  - skipped real-compiler tests (ALPC_BIN not found: ${alpcBin})`);
   } else {
