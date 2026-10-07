@@ -1,0 +1,11 @@
+line 1: OUTCOME "OUTCOME"
+line 1: IDENT "remedial"
+line 1: SEMI ";"
+line 2: IF "IF"
+line 2: IDENT "performance"
+line 2: LT "<"
+line 2: NUMBER "70"
+line 2: GOTO "GOTO"
+line 2: IDENT "remedial"
+line 2: SEMI ";"
+EOF

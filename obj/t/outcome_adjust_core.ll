@@ -1,5 +1,5 @@
-; ModuleID = 'examples\pathway.edu'
-source_filename = "examples\pathway.edu"
+; ModuleID = 'C:/Users/chaks/ALPC/tests/fixtures/valid/outcome_adjust_core.edu'
+source_filename = "C:/Users/chaks/ALPC/tests/fixtures/valid/outcome_adjust_core.edu"
 
 declare i32 @putchar(i32)
 
@@ -40,14 +40,11 @@ done:
 
 define i32 @main() {
 entry:
-  %grade_level = alloca i32
-  store i32 0, ptr %grade_level
   %performance = alloca i32
   store i32 0, ptr %performance
   %state = alloca i32
   store i32 0, ptr %state
-  store i32 5, ptr %grade_level
-  store i32 60, ptr %performance
+  store i32 75, ptr %performance
   store i32 0, ptr %state
   %state.cur.0 = load i32, ptr %state
   %fusion.0 = add i32 %state.cur.0, 15
@@ -70,12 +67,18 @@ after2:
   br label %prog_end
 
 outcome.remedial:
+  %state.cur.4 = load i32, ptr %state
+  %outcome.adjust.4 = sub i32 %state.cur.4, 5
+  store i32 %outcome.adjust.4, ptr %state
   br label %prog_end
 
 outcome.core:
   br label %prog_end
 
 outcome.advanced:
+  %state.cur.5 = load i32, ptr %state
+  %outcome.adjust.5 = add i32 %state.cur.5, 10
+  store i32 %outcome.adjust.5, ptr %state
   br label %prog_end
 
 prog_end:

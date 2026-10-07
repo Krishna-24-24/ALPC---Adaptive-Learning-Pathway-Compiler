@@ -121,22 +121,25 @@ enum yysymbol_kind_t
   YYSYMBOL_LT = 9,                         /* LT  */
   YYSYMBOL_GT = 10,                        /* GT  */
   YYSYMBOL_EQ = 11,                        /* EQ  */
-  YYSYMBOL_ASSIGN = 12,                    /* ASSIGN  */
-  YYSYMBOL_ADD_ASSIGN = 13,                /* ADD_ASSIGN  */
-  YYSYMBOL_SUB_ASSIGN = 14,                /* SUB_ASSIGN  */
-  YYSYMBOL_SEMI = 15,                      /* SEMI  */
-  YYSYMBOL_SEMI_B = 16,                    /* SEMI_B  */
-  YYSYMBOL_YYACCEPT = 17,                  /* $accept  */
-  YYSYMBOL_program = 18,                   /* program  */
-  YYSYMBOL_stmt_list = 19,                 /* stmt_list  */
-  YYSYMBOL_stmt = 20,                      /* stmt  */
-  YYSYMBOL_outcome_stmt = 21,              /* outcome_stmt  */
-  YYSYMBOL_outcome_op = 22,                /* outcome_op  */
-  YYSYMBOL_set_stmt = 23,                  /* set_stmt  */
-  YYSYMBOL_set_op = 24,                    /* set_op  */
-  YYSYMBOL_branch_stmt = 25,               /* branch_stmt  */
-  YYSYMBOL_rel = 26,                       /* rel  */
-  YYSYMBOL_term = 27                       /* term  */
+  YYSYMBOL_NE = 12,                        /* NE  */
+  YYSYMBOL_LE = 13,                        /* LE  */
+  YYSYMBOL_GE = 14,                        /* GE  */
+  YYSYMBOL_ASSIGN = 15,                    /* ASSIGN  */
+  YYSYMBOL_ADD_ASSIGN = 16,                /* ADD_ASSIGN  */
+  YYSYMBOL_SUB_ASSIGN = 17,                /* SUB_ASSIGN  */
+  YYSYMBOL_SEMI = 18,                      /* SEMI  */
+  YYSYMBOL_SEMI_B = 19,                    /* SEMI_B  */
+  YYSYMBOL_YYACCEPT = 20,                  /* $accept  */
+  YYSYMBOL_program = 21,                   /* program  */
+  YYSYMBOL_stmt_list = 22,                 /* stmt_list  */
+  YYSYMBOL_stmt = 23,                      /* stmt  */
+  YYSYMBOL_outcome_stmt = 24,              /* outcome_stmt  */
+  YYSYMBOL_outcome_op = 25,                /* outcome_op  */
+  YYSYMBOL_set_stmt = 26,                  /* set_stmt  */
+  YYSYMBOL_set_op = 27,                    /* set_op  */
+  YYSYMBOL_branch_stmt = 28,               /* branch_stmt  */
+  YYSYMBOL_rel = 29,                       /* rel  */
+  YYSYMBOL_term = 30                       /* term  */
 };
 typedef enum yysymbol_kind_t yysymbol_kind_t;
 
@@ -444,19 +447,19 @@ union yyalloc
 /* YYFINAL -- State number of the termination state.  */
 #define YYFINAL  17
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   35
+#define YYLAST   38
 
 /* YYNTOKENS -- Number of terminals.  */
-#define YYNTOKENS  17
+#define YYNTOKENS  20
 /* YYNNTS -- Number of nonterminals.  */
 #define YYNNTS  11
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  23
+#define YYNRULES  26
 /* YYNSTATES -- Number of states.  */
-#define YYNSTATES  39
+#define YYNSTATES  42
 
 /* YYMAXUTOK -- Last valid token kind.  */
-#define YYMAXUTOK   271
+#define YYMAXUTOK   274
 
 
 /* YYTRANSLATE(TOKEN-NUM) -- Symbol number corresponding to TOKEN-NUM
@@ -497,7 +500,7 @@ static const yytype_int8 yytranslate[] =
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     1,     2,     3,     4,
        5,     6,     7,     8,     9,    10,    11,    12,    13,    14,
-      15,    16
+      15,    16,    17,    18,    19
 };
 
 #if YYDEBUG
@@ -505,8 +508,8 @@ static const yytype_int8 yytranslate[] =
 static const yytype_int8 yyrline[] =
 {
        0,    44,    44,    45,    49,    50,    54,    55,    56,    57,
-      61,    65,    73,    74,    78,    86,    87,    88,    92,   100,
-     101,   102,   106,   107
+      61,    66,    75,    76,    80,    89,    90,    91,    95,   104,
+     105,   106,   107,   108,   109,   113,   114
 };
 #endif
 
@@ -524,9 +527,9 @@ yysymbol_name (yysymbol_kind_t yysymbol)
   static const char *const yy_sname[] =
   {
   "end of file", "error", "invalid token", "SET", "IF", "GOTO", "OUTCOME",
-  "IDENT", "NUMBER", "LT", "GT", "EQ", "ASSIGN", "ADD_ASSIGN",
-  "SUB_ASSIGN", "SEMI", "SEMI_B", "$accept", "program", "stmt_list",
-  "stmt", "outcome_stmt", "outcome_op", "set_stmt", "set_op",
+  "IDENT", "NUMBER", "LT", "GT", "EQ", "NE", "LE", "GE", "ASSIGN",
+  "ADD_ASSIGN", "SUB_ASSIGN", "SEMI", "SEMI_B", "$accept", "program",
+  "stmt_list", "stmt", "outcome_stmt", "outcome_op", "set_stmt", "set_op",
   "branch_stmt", "rel", "term", YY_NULLPTR
   };
   return yy_sname[yysymbol];
@@ -547,10 +550,11 @@ yysymbol_name (yysymbol_kind_t yysymbol)
    STATE-NUM.  */
 static const yytype_int8 yypact[] =
 {
-       1,    14,    -4,    -1,     3,    13,     8,   -17,   -17,   -17,
-     -17,   -17,   -17,   -17,     6,    17,     9,   -17,   -17,   -17,
-     -17,   -17,    23,   -17,   -17,   -17,    24,   -17,   -17,    25,
-     -17,    14,    11,    14,   -17,    27,   -17,    14,   -17
+       1,     3,    -4,    -1,     6,    10,     8,   -17,   -17,   -17,
+     -17,   -17,   -17,   -17,     0,    16,    15,   -17,   -17,   -17,
+     -17,   -17,    11,   -17,   -17,   -17,   -17,   -17,   -17,    27,
+     -17,   -17,    28,   -17,     3,    18,     3,   -17,    30,   -17,
+       3,   -17
 };
 
 /* YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
@@ -559,22 +563,23 @@ static const yytype_int8 yypact[] =
 static const yytype_int8 yydefact[] =
 {
        0,     0,     0,     0,     0,     0,     0,     5,     6,     7,
-       8,    22,    23,     9,     0,     0,     0,     1,     4,    15,
-      16,    17,     0,    19,    20,    21,     0,    12,    13,     0,
-      10,     0,     0,     0,    14,     0,    11,     0,    18
+       8,    25,    26,     9,     0,     0,     0,     1,     4,    15,
+      16,    17,     0,    19,    20,    21,    22,    23,    24,     0,
+      12,    13,     0,    10,     0,     0,     0,    14,     0,    11,
+       0,    18
 };
 
 /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int8 yypgoto[] =
 {
-     -17,   -17,   -17,    29,   -17,   -17,   -17,   -17,   -17,   -17,
+     -17,   -17,   -17,    32,   -17,   -17,   -17,   -17,   -17,   -17,
      -16
 };
 
 /* YYDEFGOTO[NTERM-NUM].  */
 static const yytype_int8 yydefgoto[] =
 {
-       0,     5,     6,     7,     8,    29,     9,    22,    10,    26,
+       0,     5,     6,     7,     8,    32,     9,    22,    10,    29,
       13
 };
 
@@ -583,36 +588,37 @@ static const yytype_int8 yydefgoto[] =
    number is the opposite.  If YYTABLE_NINF, syntax error.  */
 static const yytype_int8 yytable[] =
 {
-      30,    -2,     1,    14,     2,     3,    15,     4,    -3,     1,
-      16,     2,     3,    17,     4,    34,    35,    36,    19,    20,
-      21,    38,    27,    28,    11,    12,    23,    24,    25,    11,
-      12,    31,    32,    33,    37,    18
+      33,    -2,     1,    14,     2,     3,    15,     4,    -3,     1,
+      17,     2,     3,    16,     4,    19,    20,    21,    37,    34,
+      39,    11,    12,    38,    41,    23,    24,    25,    26,    27,
+      28,    30,    31,    11,    12,    35,    36,    40,    18
 };
 
 static const yytype_int8 yycheck[] =
 {
       16,     0,     1,     7,     3,     4,     7,     6,     0,     1,
-       7,     3,     4,     0,     6,    31,     5,    33,    12,    13,
-      14,    37,    13,    14,    15,    16,     9,    10,    11,    15,
-      16,     8,     8,     8,     7,     6
+       0,     3,     4,     7,     6,    15,    16,    17,    34,     8,
+      36,    18,    19,     5,    40,     9,    10,    11,    12,    13,
+      14,    16,    17,    18,    19,     8,     8,     7,     6
 };
 
 /* YYSTOS[STATE-NUM] -- The symbol kind of the accessing symbol of
    state STATE-NUM.  */
 static const yytype_int8 yystos[] =
 {
-       0,     1,     3,     4,     6,    18,    19,    20,    21,    23,
-      25,    15,    16,    27,     7,     7,     7,     0,    20,    12,
-      13,    14,    24,     9,    10,    11,    26,    13,    14,    22,
-      27,     8,     8,     8,    27,     5,    27,     7,    27
+       0,     1,     3,     4,     6,    21,    22,    23,    24,    26,
+      28,    18,    19,    30,     7,     7,     7,     0,    23,    15,
+      16,    17,    27,     9,    10,    11,    12,    13,    14,    29,
+      16,    17,    25,    30,     8,     8,     8,    30,     5,    30,
+       7,    30
 };
 
 /* YYR1[RULE-NUM] -- Symbol kind of the left-hand side of rule RULE-NUM.  */
 static const yytype_int8 yyr1[] =
 {
-       0,    17,    18,    18,    19,    19,    20,    20,    20,    20,
-      21,    21,    22,    22,    23,    24,    24,    24,    25,    26,
-      26,    26,    27,    27
+       0,    20,    21,    21,    22,    22,    23,    23,    23,    23,
+      24,    24,    25,    25,    26,    27,    27,    27,    28,    29,
+      29,    29,    29,    29,    29,    30,    30
 };
 
 /* YYR2[RULE-NUM] -- Number of symbols on the right-hand side of rule RULE-NUM.  */
@@ -620,7 +626,7 @@ static const yytype_int8 yyr2[] =
 {
        0,     2,     0,     1,     2,     1,     1,     1,     1,     2,
        3,     5,     1,     1,     5,     1,     1,     1,     7,     1,
-       1,     1,     1,     1
+       1,     1,     1,     1,     1,     1,     1
 };
 
 
@@ -1380,7 +1386,7 @@ yydestruct (const char *yymsg,
     case YYSYMBOL_IDENT: /* IDENT  */
 #line 39 "src\\parser.y"
             { free(((*yyvaluep).sval)); }
-#line 1384 "obj\\parser.tab.c"
+#line 1390 "obj\\parser.tab.c"
         break;
 
       default:
@@ -1691,99 +1697,121 @@ yyreduce:
   case 9: /* stmt: error term  */
 #line 57 "src\\parser.y"
                       { yyerrok; }
-#line 1695 "obj\\parser.tab.c"
+#line 1701 "obj\\parser.tab.c"
     break;
 
   case 10: /* outcome_stmt: OUTCOME IDENT term  */
 #line 62 "src\\parser.y"
       { g_program->stmts.push_back(
-            std::make_unique<alpc::Outcome>((yylsp[-1]).first_line, (yyvsp[-1].sval)));
+            std::make_unique<alpc::Outcome>((yylsp[-1]).first_line, (yyvsp[-1].sval), 0,
+                                            (yylsp[-1]).first_column));
         free((yyvsp[-1].sval)); }
-#line 1703 "obj\\parser.tab.c"
+#line 1710 "obj\\parser.tab.c"
     break;
 
   case 11: /* outcome_stmt: OUTCOME IDENT outcome_op NUMBER term  */
-#line 66 "src\\parser.y"
+#line 67 "src\\parser.y"
       { g_program->stmts.push_back(
-            std::make_unique<alpc::Outcome>((yylsp[-3]).first_line, (yyvsp[-3].sval), (yyvsp[-2].ival) * (yyvsp[-1].ival)));
+            std::make_unique<alpc::Outcome>((yylsp[-3]).first_line, (yyvsp[-3].sval), (yyvsp[-2].ival) * (yyvsp[-1].ival),
+                                            (yylsp[-3]).first_column));
         free((yyvsp[-3].sval)); }
-#line 1711 "obj\\parser.tab.c"
+#line 1719 "obj\\parser.tab.c"
     break;
 
   case 12: /* outcome_op: ADD_ASSIGN  */
-#line 73 "src\\parser.y"
+#line 75 "src\\parser.y"
                 { (yyval.ival) = 1; }
-#line 1717 "obj\\parser.tab.c"
+#line 1725 "obj\\parser.tab.c"
     break;
 
   case 13: /* outcome_op: SUB_ASSIGN  */
-#line 74 "src\\parser.y"
+#line 76 "src\\parser.y"
                 { (yyval.ival) = -1; }
-#line 1723 "obj\\parser.tab.c"
+#line 1731 "obj\\parser.tab.c"
     break;
 
   case 14: /* set_stmt: SET IDENT set_op NUMBER term  */
-#line 79 "src\\parser.y"
+#line 81 "src\\parser.y"
       { g_program->stmts.push_back(
             std::make_unique<alpc::ProfileSet>(
-                (yylsp[-3]).first_line, (yyvsp[-3].sval), static_cast<alpc::SetOp>((yyvsp[-2].ival)), (yyvsp[-1].ival)));
+                (yylsp[-3]).first_line, (yyvsp[-3].sval), static_cast<alpc::SetOp>((yyvsp[-2].ival)), (yyvsp[-1].ival),
+                (yylsp[-3]).first_column));
         free((yyvsp[-3].sval)); }
-#line 1732 "obj\\parser.tab.c"
+#line 1741 "obj\\parser.tab.c"
     break;
 
   case 15: /* set_op: ASSIGN  */
-#line 86 "src\\parser.y"
+#line 89 "src\\parser.y"
                 { (yyval.ival) = alpc::OP_ASSIGN; }
-#line 1738 "obj\\parser.tab.c"
+#line 1747 "obj\\parser.tab.c"
     break;
 
   case 16: /* set_op: ADD_ASSIGN  */
-#line 87 "src\\parser.y"
+#line 90 "src\\parser.y"
                 { (yyval.ival) = alpc::OP_ADD; }
-#line 1744 "obj\\parser.tab.c"
+#line 1753 "obj\\parser.tab.c"
     break;
 
   case 17: /* set_op: SUB_ASSIGN  */
-#line 88 "src\\parser.y"
+#line 91 "src\\parser.y"
                 { (yyval.ival) = alpc::OP_SUB; }
-#line 1750 "obj\\parser.tab.c"
-    break;
-
-  case 18: /* branch_stmt: IF IDENT rel NUMBER GOTO IDENT term  */
-#line 93 "src\\parser.y"
-      { g_program->stmts.push_back(
-            std::make_unique<alpc::CondBranch>(
-                (yylsp[-5]).first_line, (yyvsp[-5].sval), static_cast<alpc::RelOp>((yyvsp[-4].ival)), (yyvsp[-3].ival), (yyvsp[-1].sval)));
-        free((yyvsp[-5].sval)); free((yyvsp[-1].sval)); }
 #line 1759 "obj\\parser.tab.c"
     break;
 
+  case 18: /* branch_stmt: IF IDENT rel NUMBER GOTO IDENT term  */
+#line 96 "src\\parser.y"
+      { g_program->stmts.push_back(
+            std::make_unique<alpc::CondBranch>(
+                (yylsp[-5]).first_line, (yyvsp[-5].sval), static_cast<alpc::RelOp>((yyvsp[-4].ival)), (yyvsp[-3].ival), (yyvsp[-1].sval),
+                (yylsp[-5]).first_column, (yylsp[-1]).first_column));
+        free((yyvsp[-5].sval)); free((yyvsp[-1].sval)); }
+#line 1769 "obj\\parser.tab.c"
+    break;
+
   case 19: /* rel: LT  */
-#line 100 "src\\parser.y"
+#line 104 "src\\parser.y"
         { (yyval.ival) = alpc::REL_LT; }
-#line 1765 "obj\\parser.tab.c"
+#line 1775 "obj\\parser.tab.c"
     break;
 
   case 20: /* rel: GT  */
-#line 101 "src\\parser.y"
+#line 105 "src\\parser.y"
         { (yyval.ival) = alpc::REL_GT; }
-#line 1771 "obj\\parser.tab.c"
+#line 1781 "obj\\parser.tab.c"
     break;
 
   case 21: /* rel: EQ  */
-#line 102 "src\\parser.y"
+#line 106 "src\\parser.y"
         { (yyval.ival) = alpc::REL_EQ; }
-#line 1777 "obj\\parser.tab.c"
-    break;
-
-  case 23: /* term: SEMI_B  */
-#line 107 "src\\parser.y"
-              { g_program->binary_output = true; }
-#line 1783 "obj\\parser.tab.c"
-    break;
-
-
 #line 1787 "obj\\parser.tab.c"
+    break;
+
+  case 22: /* rel: NE  */
+#line 107 "src\\parser.y"
+        { (yyval.ival) = alpc::REL_NE; }
+#line 1793 "obj\\parser.tab.c"
+    break;
+
+  case 23: /* rel: LE  */
+#line 108 "src\\parser.y"
+        { (yyval.ival) = alpc::REL_LE; }
+#line 1799 "obj\\parser.tab.c"
+    break;
+
+  case 24: /* rel: GE  */
+#line 109 "src\\parser.y"
+        { (yyval.ival) = alpc::REL_GE; }
+#line 1805 "obj\\parser.tab.c"
+    break;
+
+  case 26: /* term: SEMI_B  */
+#line 114 "src\\parser.y"
+              { g_program->binary_output = true; }
+#line 1811 "obj\\parser.tab.c"
+    break;
+
+
+#line 1815 "obj\\parser.tab.c"
 
         default: break;
       }
@@ -2023,9 +2051,10 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 110 "src\\parser.y"
+#line 117 "src\\parser.y"
 
 
 void yyerror(const char *msg) {
-  alpc::report(yylloc.first_line, msg);
+  alpc::report(alpc::DK_SYNTAX, "syntax", yylloc.first_line,
+               yylloc.first_column, msg);
 }

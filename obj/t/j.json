@@ -1,0 +1,28 @@
+{
+  "success": false,
+  "file": "C:/Users/chaks/ALPC/tests/fixtures/invalid/var_before_set.edu",
+  "binaryOutput": false,
+  "stages": {"lexer": "success", "parser": "success", "semantic": "error", "codegen": "skipped"},
+  "checks": {"backwardDesign": true},
+  "tokens": [
+    {"line":1,"col":1,"type":"OUTCOME","lexeme":"OUTCOME"},
+    {"line":1,"col":9,"type":"IDENT","lexeme":"remedial"},
+    {"line":1,"col":17,"type":"SEMI","lexeme":";"},
+    {"line":2,"col":1,"type":"IF","lexeme":"IF"},
+    {"line":2,"col":4,"type":"IDENT","lexeme":"performance"},
+    {"line":2,"col":16,"type":"LT","lexeme":"<"},
+    {"line":2,"col":18,"type":"NUMBER","lexeme":"70"},
+    {"line":2,"col":21,"type":"GOTO","lexeme":"GOTO"},
+    {"line":2,"col":26,"type":"IDENT","lexeme":"remedial"},
+    {"line":2,"col":34,"type":"SEMI","lexeme":";"}
+  ],
+  "trace": ["outcome remedial", "branch performance < 70 -> remedial"],
+  "ast": {"kind":"Program","binaryOutput":false,"stmts":[
+    {"kind":"Outcome","line":1,"col":9,"name":"remedial","adjust":0},
+    {"kind":"CondBranch","line":2,"col":4,"var":"performance","rel":"<","value":70,"target":"remedial","targetCol":26}
+  ]},
+  "diagnostics": [
+    {"kind":"semantic","code":"use-before-set","line":2,"col":4,"message":"'performance' is used in a condition before it is set"}
+  ],
+  "ir": null
+}

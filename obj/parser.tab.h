@@ -63,11 +63,14 @@ extern int yydebug;
     LT = 264,                      /* LT  */
     GT = 265,                      /* GT  */
     EQ = 266,                      /* EQ  */
-    ASSIGN = 267,                  /* ASSIGN  */
-    ADD_ASSIGN = 268,              /* ADD_ASSIGN  */
-    SUB_ASSIGN = 269,              /* SUB_ASSIGN  */
-    SEMI = 270,                    /* SEMI  */
-    SEMI_B = 271                   /* SEMI_B  */
+    NE = 267,                      /* NE  */
+    LE = 268,                      /* LE  */
+    GE = 269,                      /* GE  */
+    ASSIGN = 270,                  /* ASSIGN  */
+    ADD_ASSIGN = 271,              /* ADD_ASSIGN  */
+    SUB_ASSIGN = 272,              /* SUB_ASSIGN  */
+    SEMI = 273,                    /* SEMI  */
+    SEMI_B = 274                   /* SEMI_B  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -81,7 +84,7 @@ union YYSTYPE
   int   ival;
   char *sval;
 
-#line 85 "obj\\parser.tab.h"
+#line 88 "obj\\parser.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
