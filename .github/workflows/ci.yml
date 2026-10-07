@@ -77,7 +77,7 @@ jobs:
           msystem: MINGW64
           update: true
           install: >-
-            make flex bison diffutils
+            make flex bison diffutils python
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-llvm
       - name: Build and run the fixtures

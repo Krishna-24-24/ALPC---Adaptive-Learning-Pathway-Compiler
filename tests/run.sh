@@ -34,11 +34,17 @@ bad()  { echo "  FAIL $1"; shift; [ $# -gt 0 ] && printf '%s\n' "$@" | sed 's/^/
 run_mode() { timeout 5 "$ALPC" "$1" "$2" 2>/dev/null | tr -d '\r'; }
 
 golden_check() { # label golden mode edu
-  local actual; actual="$(run_mode "$3" "$4")"
-  if diff -u "$2" <(printf '%s\n' "$actual") >"$TMP/d" 2>&1; then
+  local actual want; actual="$(run_mode "$3" "$4")"
+  want="$(tr -d '\r' <"$2")"
+  # Compare in bash so a missing diff (minimal MSYS2) cannot fail the suite;
+  # diff is only used, when present, to show what changed.
+  if [ "$actual" == "$want" ]; then
     ok "$1"
-  else
+  elif command -v diff >/dev/null 2>&1; then
+    diff -u <(printf '%s\n' "$want") <(printf '%s\n' "$actual") >"$TMP/d" 2>&1
     bad "$1" "$(cat "$TMP/d")"
+  else
+    bad "$1" "want:" "$want" "got:" "$actual"
   fi
 }
 
