@@ -1,5 +1,10 @@
 'use strict';
 
+// Runs the real ALPC compiler and lli, and turns their output into the shape
+// the frontend uses. Nothing here re-implements compiler logic: tokens, AST,
+// diagnostics and IR come from `alpc --json`, and the score and outcome come
+// from the lines the compiled program prints when lli runs it.
+
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const { mkdtemp, writeFile, rm } = require('fs/promises');
@@ -31,11 +36,7 @@ function buildEnv() {
 async function runBin(bin, args, cwd) {
   try {
     const { stdout, stderr } = await execFileAsync(bin, args, {
-      cwd,
-      env: buildEnv(),
-      timeout: EXEC_TIMEOUT_MS,
-      maxBuffer: MAX_BUFFER,
-      windowsHide: true,
+      cwd, env: buildEnv(), timeout: EXEC_TIMEOUT_MS, maxBuffer: MAX_BUFFER, windowsHide: true,
     });
     return { stdout: stdout || '', stderr: stderr || '', exitCode: 0, signal: null };
   } catch (err) {
@@ -59,31 +60,84 @@ async function runBin(bin, args, cwd) {
 }
 
 /**
- * Parse lli stdout: a decimal integer (normal mode) or a binary string like
- * "1111" (; b mode). The mode must come from the compiler: in normal mode a
- * score such as 10 is also all 0s and 1s, so the text alone is ambiguous.
+ * Parse what the compiled program printed:
+ *   line 1  the alignment score, in decimal, or in binary when the program used `; b`
+ *   line 2  "outcome <name>" or "outcome none"
+ * The binary flag comes from the compiler, because a decimal score such as 10
+ * also consists only of 0s and 1s.
  */
 function parseRunOutput(stdout, binaryMode) {
-  const raw = stdout.trim();
-  if (!raw) return { alignmentScore: null, binaryOutput: null };
+  const lines = stdout.replace(/\r/g, '').split('\n').map(l => l.trim()).filter(Boolean);
+  const first = lines[0] || '';
+  let alignmentScore = null;
+  let binaryOutput = null;
+  if (binaryMode && /^[01]+$/.test(first)) {
+    binaryOutput = first;
+    alignmentScore = parseInt(first, 2);
+  } else if (/^-?\d+$/.test(first)) {
+    alignmentScore = parseInt(first, 10);
+  }
+  const m = /^outcome (\w+)$/.exec(lines[1] || '');
+  const outcome = m && m[1] !== 'none' ? m[1] : null;
+  return { alignmentScore, binaryOutput, outcome, reportedOutcome: !!m };
+}
 
-  if (binaryMode && /^[01]+$/.test(raw)) {
+const DIAG_STAGE = { lexical: 'tokens', syntax: 'parse', semantic: 'parse' };
+
+/** `alpc --dump-ast`-style label for one AST node from the --json output. */
+function astLabel(node) {
+  const fields = Object.entries(node)
+    .filter(([k]) => !['kind', 'col', 'targetCol'].includes(k))
+    .map(([k, v]) => (typeof v === 'string' ? `${k}="${v}"` : `${k}=${v}`));
+  return `${node.kind}  ${fields.join('  ')}`;
+}
+
+/** Runs `alpc --json` on a source string. Returns the parsed JSON or a failure stage. */
+async function runCompiler(source, workDir) {
+  await writeFile(path.join(workDir, 'input.edu'), source, 'utf8');
+  const res = await runBin(ALPC_BIN, ['--json', 'input.edu'], workDir);
+  if (res.exitCode === 127) return { error: res.stderr };
+  try {
+    return { json: JSON.parse(res.stdout) };
+  } catch {
+    const old = /unknown mode: --json/.test(res.stderr);
     return {
-      binaryOutput: raw,
-      alignmentScore: parseInt(raw, 2),
+      error: old
+        ? 'This alpc binary is older than the --json mode. Rebuild the compiler with make or npm run build:compiler.'
+        : `The compiler did not return valid output (exit ${res.exitCode}). ${res.stderr.trim()}`,
     };
   }
-  const n = parseInt(raw, 10);
-  return {
-    alignmentScore: isNaN(n) ? null : n,
-    binaryOutput: null,
-  };
+}
+
+function diagnosticsOf(json) {
+  return (json.diagnostics || []).map(d => ({
+    stage: DIAG_STAGE[d.kind] || 'parse',
+    kind: d.kind,
+    code: d.code,
+    line: d.line,
+    col: d.col,
+    message: d.line > 0 ? `line ${d.line}${d.col > 0 ? `, col ${d.col}` : ''}: ${d.message}` : d.message,
+  }));
+}
+
+/** Compile only: tokens, trace, AST, diagnostics, IR. Fast enough to run while typing. */
+async function check(source) {
+  if (Buffer.byteLength(source, 'utf8') > MAX_SOURCE_BYTES) {
+    throw new Error(`Source too large (max ${MAX_SOURCE_BYTES} bytes)`);
+  }
+  const workDir = await mkdtemp(path.join(tmpdir(), 'alpc-ls-'));
+  try {
+    const { json, error } = await runCompiler(source, workDir);
+    if (error) return { success: false, diagnostics: [{ stage: 'tokens', kind: 'internal', code: 'compiler', line: 0, col: 0, message: error }], backwardDesign: null };
+    return { success: json.success, diagnostics: diagnosticsOf(json), backwardDesign: json.checks?.backwardDesign ?? null, stages: json.stages };
+  } finally {
+    await rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 /**
- * Compile a Path-Lang source string through the full ALPC pipeline.
- * Runs all 5 stages sequentially: tokens → parse → ast → ir → lli
- * Returns a structured result with per-stage output.
+ * Compile a Path-Lang program with ALPC and run it with lli.
+ * Returns everything the frontend shows, all of it produced by the two tools.
  */
 async function compile(source) {
   if (Buffer.byteLength(source, 'utf8') > MAX_SOURCE_BYTES) {
@@ -91,76 +145,72 @@ async function compile(source) {
   }
 
   const workDir = await mkdtemp(path.join(tmpdir(), 'alpc-ls-'));
-  const srcPath = path.join(workDir, 'input.edu');
-  const irPath  = path.join(workDir, 'input.ll');
-
-  const stages = [];
-  let irSource       = '';
-  let alignmentScore = null;
-  let binaryOutput   = null;
-
-  const skipped = (ids) => ids.forEach(id =>
-    stages.push({ id, status: 'skipped', stdout: '', stderr: '', exitCode: null })
-  );
+  const result = {
+    success: false, outcome: null, alignmentScore: null, binaryOutput: null,
+    tokens: [], traceLines: [], ast: null, irSource: '', stages: [], diagnostics: [], backwardDesign: null,
+  };
+  const stage = (id, status, stdout = '', stderr = '', exitCode = null) =>
+    result.stages.push({ id, status, stdout, stderr, exitCode });
 
   try {
-    await writeFile(srcPath, source, 'utf8');
-
-    // ── Stage 1: Tokens ────────────────────────────────────────────
-    const tokRes = await runBin(ALPC_BIN, ['--dump-tokens', 'input.edu'], workDir);
-    stages.push({ id: 'tokens', status: tokRes.exitCode === 0 ? 'success' : 'error', ...tokRes });
-    if (tokRes.exitCode !== 0) {
-      skipped(['parse', 'ast', 'ir', 'run']);
-      return { success: false, stages, irSource, alignmentScore, binaryOutput };
+    const { json, error } = await runCompiler(source, workDir);
+    if (error) {
+      stage('tokens', 'error', '', error, 1);
+      ['parse', 'ast', 'ir', 'run'].forEach(id => stage(id, 'skipped'));
+      result.diagnostics = [{ stage: 'tokens', kind: 'internal', code: 'compiler', line: 0, col: 0, message: error }];
+      return result;
     }
 
-    // ── Stage 2: Parse trace ───────────────────────────────────────
-    const parseRes = await runBin(ALPC_BIN, ['--parse-trace', 'input.edu'], workDir);
-    stages.push({ id: 'parse', status: parseRes.exitCode === 0 ? 'success' : 'error', ...parseRes });
-    if (parseRes.exitCode !== 0) {
-      skipped(['ast', 'ir', 'run']);
-      return { success: false, stages, irSource, alignmentScore, binaryOutput };
+    result.tokens = json.tokens || [];
+    result.traceLines = json.trace || [];
+    result.diagnostics = diagnosticsOf(json);
+    result.backwardDesign = json.checks?.backwardDesign ?? null;
+    if (json.ast) {
+      result.ast = {
+        label: `Program binary_output=${json.ast.binaryOutput ? 1 : 0}`,
+        depth: 0,
+        children: (json.ast.stmts || []).map(n => ({ label: astLabel(n), depth: 1, children: [] })),
+      };
     }
 
-    // ── Stage 3: AST ──────────────────────────────────────────────
-    const astRes = await runBin(ALPC_BIN, ['--dump-ast', 'input.edu'], workDir);
-    stages.push({ id: 'ast', status: astRes.exitCode === 0 ? 'success' : 'error', ...astRes });
-    if (astRes.exitCode !== 0) {
-      skipped(['ir', 'run']);
-      return { success: false, stages, irSource, alignmentScore, binaryOutput };
-    }
+    const errorsFor = id => result.diagnostics.filter(d => d.stage === id).map(d => d.message).join('\n');
+    const st = json.stages || {};
+    const parseFailed = st.parser === 'error' || st.semantic === 'error';
 
-    // ── Stage 4: LLVM IR ──────────────────────────────────────────
-    const irRes = await runBin(ALPC_BIN, ['--emit-ir', 'input.edu'], workDir);
-    stages.push({ id: 'ir', status: irRes.exitCode === 0 ? 'success' : 'error', ...irRes });
-    if (irRes.exitCode !== 0) {
-      skipped(['run']);
-      return { success: false, stages, irSource, alignmentScore, binaryOutput };
+    stage('tokens', st.lexer === 'success' ? 'success' : 'error',
+      result.tokens.map(t => `line ${t.line}: ${t.type} "${t.lexeme}"`).concat('EOF').join('\n'), errorsFor('tokens'), st.lexer === 'success' ? 0 : 1);
+    stage('parse', parseFailed ? 'error' : 'success', result.traceLines.join('\n'), errorsFor('parse'), parseFailed ? 1 : 0);
+    if (!json.success) {
+      stage('ast', parseFailed ? 'skipped' : 'success', parseFailed ? '' : [result.ast?.label, ...(result.ast?.children || []).map(c => '  ' + c.label)].join('\n'));
+      stage('ir', 'skipped');
+      stage('run', 'skipped');
+      return result;
     }
-    irSource = irRes.stdout;
+    stage('ast', 'success', [result.ast.label, ...result.ast.children.map(c => '  ' + c.label)].join('\n'), '', 0);
+    result.irSource = json.ir || '';
+    stage('ir', 'success', result.irSource, '', 0);
 
-    // ── Stage 5: lli execution ────────────────────────────────────
-    // The compiled @main returns the Alignment Score, so lli's exit status IS
-    // the score (truncated by the OS) and is non-zero for any non-zero score.
-    // Success = lli ran to completion (no signal/timeout, binary found) and
-    // printed a score; the printed value is authoritative, not the exit code.
-    await writeFile(irPath, irSource, 'utf8');
-    const binaryMode = /^binary-output$/m.test(parseRes.stdout);
-    const runRes = await runBin(LLI_BIN, ['input.ll'], workDir);
-    const parsed = parseRunOutput(runRes.stdout, binaryMode);
-    const runOk  = runRes.signal === null && runRes.exitCode !== 127
-                   && parsed.alignmentScore !== null;
-    stages.push({ id: 'run', status: runOk ? 'success' : 'error', ...runRes });
+    // The compiled @main returns the score, so lli's exit status is the score
+    // (mod 256) and is non-zero for any non-zero score. Success means lli ran
+    // to completion and printed both lines; the printed values are what count.
+    await writeFile(path.join(workDir, 'input.ll'), result.irSource, 'utf8');
+    const run = await runBin(LLI_BIN, ['input.ll'], workDir);
+    const parsed = parseRunOutput(run.stdout, !!json.binaryOutput);
+    const runOk = run.signal === null && run.exitCode !== 127 && parsed.alignmentScore !== null && parsed.reportedOutcome;
+    stage('run', runOk ? 'success' : 'error', run.stdout, runOk ? '' : (run.stderr || 'The program did not print a score and an outcome. Rebuild the compiler so it reports the outcome.'), run.exitCode);
 
     if (runOk) {
-      alignmentScore = parsed.alignmentScore;
-      binaryOutput   = parsed.binaryOutput;
+      result.success = true;
+      result.alignmentScore = parsed.alignmentScore;
+      result.binaryOutput = parsed.binaryOutput;
+      result.outcome = parsed.outcome;
+    } else {
+      result.diagnostics.push({ stage: 'run', kind: 'runtime', code: 'run', line: 0, col: 0, message: result.stages.at(-1).stderr });
     }
-
-    return { success: runOk, stages, irSource, alignmentScore, binaryOutput };
+    return result;
   } finally {
     await rm(workDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
-module.exports = { compile, parseRunOutput };
+module.exports = { compile, check, parseRunOutput };

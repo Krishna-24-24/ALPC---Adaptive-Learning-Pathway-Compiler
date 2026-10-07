@@ -150,7 +150,7 @@ router.get('/diagnostic', authMiddleware, async (req, res) => {
 
     res.json({ questions: finalQuestions });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 
@@ -195,7 +195,7 @@ router.post('/diagnostic/submit', authMiddleware, async (req, res) => {
       message: 'Diagnostic assessment completed',
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 
@@ -298,7 +298,7 @@ router.get('/adaptive', authMiddleware, async (req, res) => {
 
     res.json({ questions: finalQuestions, count: finalQuestions.length });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 
@@ -380,7 +380,7 @@ router.post('/adaptive/submit', authMiddleware, async (req, res) => {
       recommendations,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 
@@ -413,7 +413,7 @@ router.post('/answer', authMiddleware, async (req, res) => {
       updatedMastery: mastery.masteryScore,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 

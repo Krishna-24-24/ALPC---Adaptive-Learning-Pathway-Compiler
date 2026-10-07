@@ -1,0 +1,553 @@
+{
+  "_comment": "Study resources per topic. Every URL was checked to load (videos via YouTube oEmbed) on 2026-10-07. Edit freely; ids must stay unique within a topic.",
+  "levelsForOutcome": {
+    "remedial": [
+      "intro"
+    ],
+    "practice": [
+      "intro",
+      "practice"
+    ],
+    "core": [
+      "practice",
+      "core"
+    ],
+    "advanced": [
+      "core",
+      "advanced"
+    ]
+  },
+  "topics": {
+    "Arrays": [
+      {
+        "id": "geeksforgeeks-array-introduction",
+        "level": "intro",
+        "type": "article",
+        "title": "Array Introduction",
+        "source": "GeeksforGeeks",
+        "url": "https://www.geeksforgeeks.org/introduction-to-arrays-data-structure-and-algorithm-tutorials/",
+        "note": "What an array is, indexing, and the cost of each operation."
+      },
+      {
+        "id": "visualgo-array",
+        "level": "intro",
+        "type": "visualization",
+        "title": "Array",
+        "source": "VisuAlgo",
+        "url": "https://visualgo.net/en/array",
+        "note": "Step through insert, remove and search on a live array."
+      },
+      {
+        "id": "mycodeschool-data-structures-arrays-vs-linked-lists",
+        "level": "intro",
+        "type": "video",
+        "title": "Data Structures: Arrays vs Linked Lists",
+        "source": "mycodeschool",
+        "url": "https://www.youtube.com/watch?v=lC-yYCOnN8Q",
+        "note": "When to pick an array, and what it costs compared with a linked list."
+      },
+      {
+        "id": "algomasterio-two-pointers-in-7-minutes",
+        "level": "practice",
+        "type": "video",
+        "title": "Two Pointers in 7 minutes",
+        "source": "AlgoMasterIO",
+        "url": "https://www.youtube.com/watch?v=QzZ7nmouLTI",
+        "note": "The most common array pattern in interview problems."
+      },
+      {
+        "id": "geeksforgeeks-sliding-window-technique",
+        "level": "practice",
+        "type": "article",
+        "title": "Sliding Window Technique",
+        "source": "GeeksforGeeks",
+        "url": "https://www.geeksforgeeks.org/window-sliding-technique/",
+        "note": "Turns many nested-loop array problems into one pass."
+      },
+      {
+        "id": "geeksforgeeks-maximum-subarray-sum-kadane-s-algorithm",
+        "level": "core",
+        "type": "article",
+        "title": "Maximum Subarray Sum: Kadane's Algorithm",
+        "source": "GeeksforGeeks",
+        "url": "https://www.geeksforgeeks.org/largest-sum-contiguous-subarray/",
+        "note": "A classic one-pass algorithm worth knowing by heart."
+      },
+      {
+        "id": "leetcode-array-problems",
+        "level": "core",
+        "type": "problems",
+        "title": "Array problems",
+        "source": "LeetCode",
+        "url": "https://leetcode.com/problem-list/array/",
+        "note": "Filter by Easy first, then Medium."
+      },
+      {
+        "id": "freecodecamp-org-data-structures-easy-to-advanced-course",
+        "level": "advanced",
+        "type": "video",
+        "title": "Data Structures Easy to Advanced Course",
+        "source": "freeCodeCamp.org (William Fiset)",
+        "url": "https://www.youtube.com/watch?v=RBSGKlAvoiM",
+        "note": "A full course; jump to the chapter for this topic."
+      }
+    ],
+    "Strings": [
+      {
+        "id": "geeksforgeeks-introduction-to-strings",
+        "level": "intro",
+        "type": "article",
+        "title": "Introduction to Strings",
+        "source": "GeeksforGeeks",
+        "url": "https://www.geeksforgeeks.org/introduction-to-strings-data-structure-and-algorithm-tutorials/",
+        "note": "How strings are stored and the basic operations on them."
+      },
+      {
+        "id": "algomasterio-two-pointers-in-7-minutes",
+        "level": "practice",
+        "type": "video",
+        "title": "Two Pointers in 7 minutes",
+        "source": "AlgoMasterIO",
+        "url": "https://www.youtube.com/watch?v=QzZ7nmouLTI",
+        "note": "Palindromes and reversals are two-pointer problems."
+      },
+      {
+        "id": "geeksforgeeks-sliding-window-technique",
+        "level": "practice",
+        "type": "article",
+        "title": "Sliding Window Technique",
+        "source": "GeeksforGeeks",
+        "url": "https://www.geeksforgeeks.org/window-sliding-technique/",
+        "note": "The pattern behind most substring problems."
+      },
+      {
+        "id": "leetcode-string-problems",
+        "level": "core",
+        "type": "problems",
+        "title": "String problems",
+        "source": "LeetCode",
+        "url": "https://leetcode.com/problem-list/string/",
+        "note": "Start with the Easy palindrome and anagram problems."
+      },
+      {
+        "id": "abdul-knuth-morris-pratt-kmp-string-matching",
+        "level": "advanced",
+        "type": "video",
+        "title": "Knuth-Morris-Pratt (KMP) String Matching",
+        "source": "Abdul Bari",
+        "url": "https://www.youtube.com/watch?v=V5-7GzOfADQ",
+        "note": "Pattern search in linear time."
+      },
+      {
+        "id": "cp-algorithms-prefix-function-and-knuth-morris-pratt",
+        "level": "advanced",
+        "type": "article",
+        "title": "Prefix function and Knuth-Morris-Pratt",
+        "source": "cp-algorithms",
+        "url": "https://cp-algorithms.com/string/prefix-function.html",
+        "note": "The same algorithm with proofs and applications."
+      }
+    ],
+    "Linked Lists": [
+      {
+        "id": "mycodeschool-introduction-to-linked-list",
+        "level": "intro",
+        "type": "video",
+        "title": "Introduction to linked list",
+        "source": "mycodeschool",
+        "url": "https://www.youtube.com/watch?v=NobHlGUjV3g",
+        "note": "Nodes, pointers and why a list grows without copying."
+      },
+      {
+        "id": "programiz-linked-list-data-structure",
+        "level": "intro",
+        "type": "article",
+        "title": "Linked List Data Structure",
+        "source": "Programiz",
+        "url": "https://www.programiz.com/dsa/linked-list",
+        "note": "Short explanation with code in Python, Java and C."
+      },
+      {
+        "id": "visualgo-linked-list-stack-queue-deque",
+        "level": "intro",
+        "type": "visualization",
+        "title": "Linked List, Stack, Queue, Deque",
+        "source": "VisuAlgo",
+        "url": "https://visualgo.net/en/list",
+        "note": "Watch insert and delete move the pointers."
+      },
+      {
+        "id": "mycodeschool-reverse-a-linked-list-iterative-method",
+        "level": "practice",
+        "type": "video",
+        "title": "Reverse a linked list: iterative method",
+        "source": "mycodeschool",
+        "url": "https://www.youtube.com/watch?v=sYcOK51hl-A",
+        "note": "The pointer exercise every list question builds on."
+      },
+      {
+        "id": "leetcode-linked-list-problems",
+        "level": "core",
+        "type": "problems",
+        "title": "Linked list problems",
+        "source": "LeetCode",
+        "url": "https://leetcode.com/problem-list/linked-list/",
+        "note": "Reverse, merge, and detect a cycle first."
+      },
+      {
+        "id": "freecodecamp-org-data-structures-easy-to-advanced-course",
+        "level": "advanced",
+        "type": "video",
+        "title": "Data Structures Easy to Advanced Course",
+        "source": "freeCodeCamp.org (William Fiset)",
+        "url": "https://www.youtube.com/watch?v=RBSGKlAvoiM",
+        "note": "A full course; jump to the chapter for this topic."
+      }
+    ],
+    "Stacks": [
+      {
+        "id": "mycodeschool-data-structures-introduction-to-stack",
+        "level": "intro",
+        "type": "video",
+        "title": "Data structures: Introduction to stack",
+        "source": "mycodeschool",
+        "url": "https://www.youtube.com/watch?v=F1F2imiOJfk",
+        "note": "Last in, first out, and where stacks show up."
+      },
+      {
+        "id": "programiz-stack-data-structure-and-implementation",
+        "level": "intro",
+        "type": "article",
+        "title": "Stack Data Structure and Implementation",
+        "source": "Programiz",
+        "url": "https://www.programiz.com/dsa/stack",
+        "note": "Push, pop and peek with code."
+      },
+      {
+        "id": "visualgo-linked-list-stack-queue-deque",
+        "level": "practice",
+        "type": "visualization",
+        "title": "Linked List, Stack, Queue, Deque",
+        "source": "VisuAlgo",
+        "url": "https://visualgo.net/en/list",
+        "note": "Switch the mode to Stack and run push and pop."
+      },
+      {
+        "id": "mycodeschool-infix-prefix-and-postfix",
+        "level": "practice",
+        "type": "video",
+        "title": "Infix, Prefix and Postfix",
+        "source": "mycodeschool",
+        "url": "https://www.youtube.com/watch?v=jos1Flt21is",
+        "note": "The classic stack application: evaluating expressions."
+      },
+      {
+        "id": "leetcode-stack-problems",
+        "level": "core",
+        "type": "problems",
+        "title": "Stack problems",
+        "source": "LeetCode",
+        "url": "https://leetcode.com/problem-list/stack/",
+        "note": "Valid parentheses, then the monotonic stack problems."
+      },
+      {
+        "id": "freecodecamp-org-data-structures-easy-to-advanced-course",
+        "level": "advanced",
+        "type": "video",
+        "title": "Data Structures Easy to Advanced Course",
+        "source": "freeCodeCamp.org (William Fiset)",
+        "url": "https://www.youtube.com/watch?v=RBSGKlAvoiM",
+        "note": "A full course; jump to the chapter for this topic."
+      }
+    ],
+    "Queues": [
+      {
+        "id": "mycodeschool-data-structures-introduction-to-queues",
+        "level": "intro",
+        "type": "video",
+        "title": "Data structures: Introduction to Queues",
+        "source": "mycodeschool",
+        "url": "https://www.youtube.com/watch?v=XuCbpw6Bj1U",
+        "note": "First in, first out, and the operations a queue supports."
+      },
+      {
+        "id": "programiz-queue-data-structure-and-implementation",
+        "level": "intro",
+        "type": "article",
+        "title": "Queue Data Structure and Implementation",
+        "source": "Programiz",
+        "url": "https://www.programiz.com/dsa/queue",
+        "note": "Enqueue and dequeue with code."
+      },
+      {
+        "id": "programiz-circular-queue-data-structure",
+        "level": "practice",
+        "type": "article",
+        "title": "Circular Queue Data Structure",
+        "source": "Programiz",
+        "url": "https://www.programiz.com/dsa/circular-queue",
+        "note": "How a fixed array becomes a queue without shifting elements."
+      },
+      {
+        "id": "visualgo-linked-list-stack-queue-deque",
+        "level": "practice",
+        "type": "visualization",
+        "title": "Linked List, Stack, Queue, Deque",
+        "source": "VisuAlgo",
+        "url": "https://visualgo.net/en/list",
+        "note": "Switch the mode to Queue to watch both ends move."
+      },
+      {
+        "id": "leetcode-queue-problems",
+        "level": "core",
+        "type": "problems",
+        "title": "Queue problems",
+        "source": "LeetCode",
+        "url": "https://leetcode.com/problem-list/queue/",
+        "note": "Includes queue-with-stacks and sliding window maximum."
+      },
+      {
+        "id": "cp-algorithms-breadth-first-search",
+        "level": "advanced",
+        "type": "article",
+        "title": "Breadth First Search",
+        "source": "cp-algorithms",
+        "url": "https://cp-algorithms.com/graph/breadth-first-search.html",
+        "note": "The most important use of a queue, with proofs."
+      }
+    ],
+    "Trees": [
+      {
+        "id": "mycodeschool-data-structures-introduction-to-trees",
+        "level": "intro",
+        "type": "video",
+        "title": "Data structures: Introduction to Trees",
+        "source": "mycodeschool",
+        "url": "https://www.youtube.com/watch?v=qH6yxkw0u78",
+        "note": "Roots, children, depth and height."
+      },
+      {
+        "id": "programiz-tree-data-structure",
+        "level": "intro",
+        "type": "article",
+        "title": "Tree Data Structure",
+        "source": "Programiz",
+        "url": "https://www.programiz.com/dsa/trees",
+        "note": "Terminology and the main kinds of tree."
+      },
+      {
+        "id": "mycodeschool-data-structures-binary-search-tree",
+        "level": "practice",
+        "type": "video",
+        "title": "Data structures: Binary Search Tree",
+        "source": "mycodeschool",
+        "url": "https://www.youtube.com/watch?v=pYT9F8_LFTM",
+        "note": "Why an ordered tree makes search fast."
+      },
+      {
+        "id": "visualgo-binary-search-tree-avl-tree",
+        "level": "practice",
+        "type": "visualization",
+        "title": "Binary Search Tree, AVL Tree",
+        "source": "VisuAlgo",
+        "url": "https://visualgo.net/en/bst",
+        "note": "Insert keys and watch the traversals."
+      },
+      {
+        "id": "leetcode-tree-problems",
+        "level": "core",
+        "type": "problems",
+        "title": "Tree problems",
+        "source": "LeetCode",
+        "url": "https://leetcode.com/problem-list/tree/",
+        "note": "Traversals, depth and lowest common ancestor first."
+      },
+      {
+        "id": "abdul-avl-tree-insertion-and-rotations",
+        "level": "advanced",
+        "type": "video",
+        "title": "AVL Tree: Insertion and Rotations",
+        "source": "Abdul Bari",
+        "url": "https://www.youtube.com/watch?v=jDM6_TnYIqE",
+        "note": "How a tree stays balanced as you insert."
+      },
+      {
+        "id": "programiz-avl-tree",
+        "level": "advanced",
+        "type": "article",
+        "title": "AVL Tree",
+        "source": "Programiz",
+        "url": "https://www.programiz.com/dsa/avl-tree",
+        "note": "Rotations with code."
+      }
+    ],
+    "Graphs": [
+      {
+        "id": "mycodeschool-data-structures-introduction-to-graphs",
+        "level": "intro",
+        "type": "video",
+        "title": "Data structures: Introduction to graphs",
+        "source": "mycodeschool",
+        "url": "https://www.youtube.com/watch?v=gXgEDyodOJU",
+        "note": "Vertices, edges, and directed versus undirected."
+      },
+      {
+        "id": "programiz-graph-data-structure",
+        "level": "intro",
+        "type": "article",
+        "title": "Graph Data Structure",
+        "source": "Programiz",
+        "url": "https://www.programiz.com/dsa/graph",
+        "note": "Adjacency matrix and adjacency list."
+      },
+      {
+        "id": "visualgo-graph-traversal-dfs-and-bfs",
+        "level": "practice",
+        "type": "visualization",
+        "title": "Graph Traversal (DFS and BFS)",
+        "source": "VisuAlgo",
+        "url": "https://visualgo.net/en/dfsbfs",
+        "note": "Run both traversals on the same graph and compare."
+      },
+      {
+        "id": "cp-algorithms-breadth-first-search",
+        "level": "core",
+        "type": "article",
+        "title": "Breadth First Search",
+        "source": "cp-algorithms",
+        "url": "https://cp-algorithms.com/graph/breadth-first-search.html",
+        "note": "Shortest paths in unweighted graphs."
+      },
+      {
+        "id": "leetcode-graph-problems",
+        "level": "core",
+        "type": "problems",
+        "title": "Graph problems",
+        "source": "LeetCode",
+        "url": "https://leetcode.com/problem-list/graph/",
+        "note": "Number of islands and course schedule are good starts."
+      },
+      {
+        "id": "freecodecamp-org-graph-theory-tutorial-from-a-google",
+        "level": "advanced",
+        "type": "video",
+        "title": "Graph Theory Tutorial from a Google Engineer",
+        "source": "freeCodeCamp.org (William Fiset)",
+        "url": "https://www.youtube.com/watch?v=09_LlHjoEiY",
+        "note": "Dijkstra, topological sort, MST and more, in one course."
+      }
+    ],
+    "Binary Search": [
+      {
+        "id": "mycodeschool-what-is-binary-search",
+        "level": "intro",
+        "type": "video",
+        "title": "What is binary search",
+        "source": "mycodeschool",
+        "url": "https://www.youtube.com/watch?v=j5uXyPJ0Pew",
+        "note": "Halving a sorted range, step by step."
+      },
+      {
+        "id": "programiz-binary-search-with-code",
+        "level": "intro",
+        "type": "article",
+        "title": "Binary Search (With Code)",
+        "source": "Programiz",
+        "url": "https://www.programiz.com/dsa/binary-search",
+        "note": "Iterative and recursive versions."
+      },
+      {
+        "id": "university-binary-and-linear-search-visualization",
+        "level": "practice",
+        "type": "visualization",
+        "title": "Binary and Linear Search Visualization",
+        "source": "University of San Francisco",
+        "url": "https://www.cs.usfca.edu/~galles/visualization/Search.html",
+        "note": "Compare how many steps each search takes."
+      },
+      {
+        "id": "kartik-binary-search-top-6-must-do-problems",
+        "level": "practice",
+        "type": "video",
+        "title": "Binary Search: Top 6 must do problems",
+        "source": "Kartik Arora",
+        "url": "https://www.youtube.com/watch?v=U66U1-umNbQ",
+        "note": "Applying the idea beyond finding a value."
+      },
+      {
+        "id": "leetcode-binary-search-problems",
+        "level": "core",
+        "type": "problems",
+        "title": "Binary search problems",
+        "source": "LeetCode",
+        "url": "https://leetcode.com/problem-list/binary-search/",
+        "note": "Search insert position, then first and last position."
+      },
+      {
+        "id": "cp-algorithms-binary-search",
+        "level": "advanced",
+        "type": "article",
+        "title": "Binary Search",
+        "source": "cp-algorithms",
+        "url": "https://cp-algorithms.com/num_methods/binary_search.html",
+        "note": "Binary search on the answer and on real numbers."
+      }
+    ],
+    "Dynamic Programming": [
+      {
+        "id": "programiz-dynamic-programming",
+        "level": "intro",
+        "type": "article",
+        "title": "Dynamic Programming",
+        "source": "Programiz",
+        "url": "https://www.programiz.com/dsa/dynamic-programming",
+        "note": "Overlapping subproblems and memoisation in plain terms."
+      },
+      {
+        "id": "visualgo-recursion-tree-and-dag-dynamic-programming",
+        "level": "intro",
+        "type": "visualization",
+        "title": "Recursion Tree and DAG (Dynamic Programming)",
+        "source": "VisuAlgo",
+        "url": "https://visualgo.net/en/recursion",
+        "note": "See why naive recursion repeats work and how DP avoids it."
+      },
+      {
+        "id": "freecodecamp-org-dynamic-programming-learn-to-solve",
+        "level": "intro",
+        "type": "video",
+        "title": "Dynamic Programming: Learn to Solve Algorithmic Problems",
+        "source": "freeCodeCamp.org",
+        "url": "https://www.youtube.com/watch?v=oBt53YbR9Kk",
+        "note": "A long, beginner-friendly course; memoisation first, then tabulation."
+      },
+      {
+        "id": "leetcode-dynamic-programming-problems",
+        "level": "core",
+        "type": "problems",
+        "title": "Dynamic programming problems",
+        "source": "LeetCode",
+        "url": "https://leetcode.com/problem-list/dynamic-programming/",
+        "note": "Climbing stairs, house robber, coin change."
+      },
+      {
+        "id": "mit-lecture-19-dynamic-programming-i",
+        "level": "advanced",
+        "type": "video",
+        "title": "Lecture 19: Dynamic Programming I",
+        "source": "MIT OpenCourseWare",
+        "url": "https://www.youtube.com/watch?v=OQ5jsbhAv_M",
+        "note": "The 6.006 lecture: DP as shortest paths in a subproblem graph."
+      },
+      {
+        "id": "cp-algorithms-introduction-to-dynamic-programming",
+        "level": "advanced",
+        "type": "article",
+        "title": "Introduction to Dynamic Programming",
+        "source": "cp-algorithms",
+        "url": "https://cp-algorithms.com/dynamic_programming/intro-to-dp.html",
+        "note": "A rigorous introduction with competitive programming examples."
+      }
+    ]
+  }
+}

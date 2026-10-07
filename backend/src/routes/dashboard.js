@@ -47,7 +47,7 @@ router.get('/dashboard', authMiddleware, async (req, res) => {
       recommendations,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 
@@ -63,7 +63,7 @@ router.get('/mastery', authMiddleware, async (req, res) => {
       })),
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 
@@ -92,7 +92,7 @@ router.get('/history', authMiddleware, async (req, res) => {
 
     res.json({ attempts: attempts.slice(0, 20), improvementOverTime: improvement });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 
@@ -110,7 +110,7 @@ router.get('/recommendations', authMiddleware, async (req, res) => {
     const recommendations = await mlService.getBatchRecommendations(masteryMap);
     res.json({ recommendations });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 'ML_UNAVAILABLE' ? 503 : 500).json({ error: err.message });
   }
 });
 

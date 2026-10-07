@@ -7,11 +7,13 @@ const authRoutes      = require('./routes/auth');
 const quizRoutes      = require('./routes/quiz');
 const dashboardRoutes = require('./routes/dashboard');
 const alpcRoutes      = require('./routes/alpc');
+const studyRoutes     = require('./routes/study');
 const Question        = require('./models/Question');
 const Skill           = require('./models/Skill');
 // ALPC integration models (auto-indexed on first connect)
 require('./models/Pathway');
 require('./models/CompilerDecision');
+require('./models/StudyProgress');
 const { QUESTIONS, SKILLS } = require('./seed');
 
 const app = express();
@@ -28,6 +30,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api/alpc', alpcRoutes);
+app.use('/api/study', studyRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);
