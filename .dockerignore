@@ -1,0 +1,17 @@
+**/node_modules
+**/.next
+**/.env
+**/.env.*
+**/.git
+**/__pycache__
+**/*.pyc
+**/venv
+**/.venv
+obj
+alpc
+alpc.exe
+frontend
+web-demo
+design
+*.patch
+*.zip

@@ -63,6 +63,12 @@ ml-service/     FastAPI service for mastery (BKT) and question difficulty (IRT)
 docs/           architecture, API, demo script, decision records
 ```
 
+## Deploy online
+
+Follow [docs/DEPLOY.md](docs/DEPLOY.md) for MongoDB Atlas, the two Render services,
+and the Vercel frontend. The root Dockerfile includes the compiler and LLVM; do
+not deploy the legacy backend-only Dockerfile.
+
 ## Setting up on Windows
 
 1. **Compiler toolchain.** Install [MSYS2](https://www.msys2.org), then in the
@@ -100,7 +106,10 @@ docs/           architecture, API, demo script, decision records
 | `MONGODB_URI` | `mongodb://127.0.0.1:27017/learnsmart` | Database |
 | `JWT_SECRET` | development key | Signs login tokens. With `NODE_ENV=production` the server will not start unless this is a private value of at least 32 characters. |
 | `ML_SERVICE_URL` | `http://127.0.0.1:8000` | Mastery service |
-| `FRONTEND_URL` | `*` | Allowed CORS origin |
+| `FRONTEND_URL` | `http://localhost:3000` in development | Exact CORS origin, required in production; no trailing slash |
+| `TRUST_PROXY_HOPS` | `0` | Set to `1` for the single Render proxy; keep `0` for direct local access |
+| `ML_SERVICE_HOST` | unset | Render public ML hostname; used with HTTPS when `ML_SERVICE_URL` is unset |
+| `ML_TIMEOUT_MS` | `5000` | ML request timeout; the Blueprint sets `120000` for cold starts |
 | `ALPC_BIN` | `alpc.exe` / `alpc` in the repo root | Compiler |
 | `LLI_BIN`, `OPT_BIN` | `lli`, `opt` on PATH | LLVM interpreter and optimizer |
 | `COMPILE_PER_MINUTE`, `CHECK_PER_MINUTE` | `30`, `150` | Per-client limits on the public compile and live-check routes |
@@ -110,11 +119,12 @@ docs/           architecture, API, demo script, decision records
 | Command | Covers |
 |---|---|
 | `make check` | Every compiler fixture: tokens, parse trace, AST, IR verified with `opt`, and `lli` output |
-| `make test-asan` | The same fixtures and the AST unit tests under AddressSanitizer and UBSan |
+| `make test-asan` | The same fixtures and AST unit tests under ASan/UBSan on Linux; UBSan trap mode on Windows |
 | `npm test` | Backend: the PRD integration tests, study pages, and features (review schedule, option shuffling, JWT rule, rate limits, account deletion, AND/OR rules, optimizer). Uses the real compiler. |
 | `npm run build:frontend` | Production build of the app |
 
-GitHub Actions runs all of them, plus a Windows build of the compiler, on every push
+GitHub Actions runs all of them, plus a Windows compiler build and Docker image
+builds with API/compiler/ML smoke tests, on every push
 ([.github/workflows/ci.yml](.github/workflows/ci.yml)).
 
 ## Before deploying
