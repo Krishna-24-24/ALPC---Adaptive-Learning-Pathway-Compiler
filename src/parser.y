@@ -29,7 +29,7 @@ extern alpc::Program *g_program;  // set by the driver before yyparse()
 %token SET IF GOTO OUTCOME
 %token <sval> IDENT
 %token <ival> NUMBER
-%token LT GT EQ ASSIGN ADD_ASSIGN SUB_ASSIGN SEMI SEMI_B
+%token LT GT EQ NE LE GE ASSIGN ADD_ASSIGN SUB_ASSIGN SEMI SEMI_B
 
 %type <ival> set_op rel outcome_op
 
@@ -60,11 +60,13 @@ stmt
 outcome_stmt
   : OUTCOME IDENT term
       { g_program->stmts.push_back(
-            std::make_unique<alpc::Outcome>(@2.first_line, $2));
+            std::make_unique<alpc::Outcome>(@2.first_line, $2, 0,
+                                            @2.first_column));
         free($2); }
   | OUTCOME IDENT outcome_op NUMBER term
       { g_program->stmts.push_back(
-            std::make_unique<alpc::Outcome>(@2.first_line, $2, $3 * $4));
+            std::make_unique<alpc::Outcome>(@2.first_line, $2, $3 * $4,
+                                            @2.first_column));
         free($2); }
   ;
 
@@ -78,7 +80,8 @@ set_stmt
   : SET IDENT set_op NUMBER term
       { g_program->stmts.push_back(
             std::make_unique<alpc::ProfileSet>(
-                @2.first_line, $2, static_cast<alpc::SetOp>($3), $4));
+                @2.first_line, $2, static_cast<alpc::SetOp>($3), $4,
+                @2.first_column));
         free($2); }
   ;
 
@@ -92,7 +95,8 @@ branch_stmt
   : IF IDENT rel NUMBER GOTO IDENT term
       { g_program->stmts.push_back(
             std::make_unique<alpc::CondBranch>(
-                @2.first_line, $2, static_cast<alpc::RelOp>($3), $4, $6));
+                @2.first_line, $2, static_cast<alpc::RelOp>($3), $4, $6,
+                @2.first_column, @6.first_column));
         free($2); free($6); }
   ;
 
@@ -100,6 +104,9 @@ rel
   : LT  { $$ = alpc::REL_LT; }
   | GT  { $$ = alpc::REL_GT; }
   | EQ  { $$ = alpc::REL_EQ; }
+  | NE  { $$ = alpc::REL_NE; }
+  | LE  { $$ = alpc::REL_LE; }
+  | GE  { $$ = alpc::REL_GE; }
   ;
 
 term
@@ -110,5 +117,6 @@ term
 %%
 
 void yyerror(const char *msg) {
-  alpc::report(yylloc.first_line, msg);
+  alpc::report(alpc::DK_SYNTAX, "syntax", yylloc.first_line,
+               yylloc.first_column, msg);
 }

@@ -14,6 +14,9 @@ const char *rel_op_str(RelOp op) {
   switch (op) {
     case REL_GT: return ">";
     case REL_EQ: return "==";
+    case REL_NE: return "!=";
+    case REL_LE: return "<=";
+    case REL_GE: return ">=";
     default:     return "<";
   }
 }

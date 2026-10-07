@@ -1,0 +1,7 @@
+# != is taken when the values differ.
+OUTCOME other += 4;
+OUTCOME same -= 1;
+SET state = 0;
+SET attempts = 3;
+IF attempts != 1 GOTO other;
+IF attempts == 1 GOTO same;

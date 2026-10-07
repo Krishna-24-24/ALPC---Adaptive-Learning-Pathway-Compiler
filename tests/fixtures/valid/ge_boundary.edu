@@ -1,0 +1,7 @@
+# >= is inclusive: 85 >= 85 is taken.
+OUTCOME below -= 1;
+OUTCOME advanced += 3;
+SET state = 0;
+SET performance = 85;
+IF performance < 85 GOTO below;
+IF performance >= 85 GOTO advanced;

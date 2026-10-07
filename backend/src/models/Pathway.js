@@ -10,7 +10,7 @@ const pathwaySchema = new mongoose.Schema({
   }],
   rules: [{
     variable: { type: String, required: true },
-    operator: { type: String, enum: ['<', '>', '==', '>=', '<='], required: true },
+    operator: { type: String, enum: ['<', '>', '==', '>=', '<=', '!='], required: true },
     value: { type: Number, required: true },
     outcome: { type: String, required: true },
   }],

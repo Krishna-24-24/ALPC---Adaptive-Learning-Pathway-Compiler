@@ -86,6 +86,40 @@ for edu in "$VALID"/*.edu; do
   ir_check "$name" "$edu"
 done
 
+# --json must agree with the text modes it summarizes (needs python3; skipped otherwise).
+PY="$(command -v python3 || command -v python || true)"
+json_check() { # label edu expect(valid|invalid)
+  local label="$1" edu="$2" expect="$3" rc
+  timeout 5 "$ALPC" --json "$edu" 2>"$TMP/je" | tr -d '\r' >"$TMP/j.json"; rc=${PIPESTATUS[0]}
+  if [ "$expect" = valid ] && [ "$rc" -ne 0 ]; then bad "$label (rc=$rc)"; return; fi
+  if [ "$expect" = invalid ] && { [ "$rc" -eq 0 ] || [ "$rc" -ge 124 ]; }; then bad "$label (rc=$rc)"; return; fi
+  if [ -s "$TMP/je" ]; then bad "$label (stderr not empty)" "$(cat "$TMP/je")"; return; fi
+  run_mode --dump-tokens "$edu" >"$TMP/jt"
+  if [ "$expect" = valid ]; then run_mode --emit-ir "$edu" >"$TMP/ji"; else : >"$TMP/ji"; fi
+  if "$PY" -I - "$TMP/j.json" "$TMP/jt" "$TMP/ji" "$expect" <<'PYEOF' >"$TMP/jd" 2>&1
+import json, sys
+d = json.load(open(sys.argv[1]))
+toks = ['line %d: %s "%s"' % (t["line"], t["type"], t["lexeme"]) for t in d["tokens"]] + ["EOF"]
+want_toks = [l for l in open(sys.argv[2]).read().split("\n") if l]
+assert toks == want_toks, "tokens differ from --dump-tokens"
+if sys.argv[4] == "valid":
+    assert d["success"] is True and d["diagnostics"] == [], "valid program reported failure"
+    assert d["ir"].rstrip("\n") == open(sys.argv[3]).read().rstrip("\n"), "ir differs from --emit-ir"
+else:
+    assert d["success"] is False and d["ir"] is None, "invalid program reported success"
+    assert d["diagnostics"] and all(x["line"] > 0 for x in d["diagnostics"]), "missing located diagnostics"
+PYEOF
+  then ok "$label"; else bad "$label" "$(cat "$TMP/jd")"; fi
+}
+
+if [ -n "$PY" ]; then
+  echo "== --json =="
+  for edu in "$VALID"/*.edu;   do [ -e "$edu" ] && json_check "json/$(basename "${edu%.edu}")" "$edu" valid; done
+  for edu in "$INVALID"/*.edu; do [ -e "$edu" ] && json_check "json/invalid/$(basename "${edu%.edu}")" "$edu" invalid; done
+else
+  echo "== --json == (skipped: python3 not found)"
+fi
+
 echo "== invalid fixtures =="
 for edu in "$INVALID"/*.edu; do
   [ -e "$edu" ] || continue

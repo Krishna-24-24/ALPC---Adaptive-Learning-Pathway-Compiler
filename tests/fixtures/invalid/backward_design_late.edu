@@ -1,0 +1,4 @@
+# 'remedial' is declared, but only after the rule that targets it.
+SET performance = 40;
+IF performance < 70 GOTO remedial;
+OUTCOME remedial;

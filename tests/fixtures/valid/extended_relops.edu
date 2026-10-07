@@ -1,0 +1,10 @@
+# >=, <=, != at their boundaries. Only the 4th rule is taken: state ends at 7.
+OUTCOME hit += 7;
+OUTCOME miss -= 1;
+SET state = 0;
+SET x = 5;
+IF x != 5 GOTO miss;
+IF x <= 4 GOTO miss;
+IF x >= 6 GOTO miss;
+IF x <= 5 GOTO hit;
+IF x >= 0 GOTO miss;

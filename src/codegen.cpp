@@ -13,6 +13,9 @@ const char *pred_of(RelOp rel) {
   switch (rel) {
     case REL_GT: return "sgt";
     case REL_EQ: return "eq";
+    case REL_NE: return "ne";
+    case REL_LE: return "sle";
+    case REL_GE: return "sge";
     default:     return "slt";
   }
 }

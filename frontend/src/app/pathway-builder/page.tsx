@@ -20,7 +20,7 @@ interface RuleEntry {
   outcome: string;
 }
 
-const OPERATORS = ['<', '>', '==', '>=', '<='];
+const OPERATORS = ['<', '>', '==', '>=', '<=', '!='];
 const VARIABLES = ['performance', 'mastery', 'attempts', 'completion_rate'];
 
 function generatePathLangPreview(
