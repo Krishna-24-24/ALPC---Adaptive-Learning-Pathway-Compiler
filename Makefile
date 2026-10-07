@@ -82,9 +82,13 @@ check-full: check test-asan cppcheck demo
 # CONSTRAINTS F7: sanitized build must pass every fixture, plus RTTI unit tests.
 # The mingw-w64 toolchain ships no libasan/libubsan, so on Windows this uses
 # UBSan in trap mode (UB -> SIGILL, no runtime needed) + libstdc++ assertions
-# + stack protector. On a Linux lab box, override:  make test-asan SAN='-fsanitize=address,undefined'
+# + stack protector. Linux defaults to AddressSanitizer + UBSan.
+ifeq ($(OS),Windows_NT)
 SAN ?= -fsanitize=undefined -fsanitize-trap=undefined -D_GLIBCXX_ASSERTIONS \
        -fstack-protector-all -fno-omit-frame-pointer
+else
+SAN ?= -fsanitize=address,undefined -fno-omit-frame-pointer
+endif
 SANOBJ := $(OBJ)/san
 .PHONY: test-asan
 test-asan: $(OBJ)/parser.tab.c $(OBJ)/parser.tab.h $(OBJ)/lex.yy.c | $(OBJ)

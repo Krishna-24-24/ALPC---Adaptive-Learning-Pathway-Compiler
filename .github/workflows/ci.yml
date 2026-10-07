@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Flex, Bison and LLVM
-        run: sudo apt-get update && sudo apt-get install -y flex bison llvm-18 && echo "/usr/lib/llvm-18/bin" >> "$GITHUB_PATH"
+        run: sudo apt-get update && sudo apt-get install -y flex bison llvm-18-dev llvm-18 && echo "/usr/lib/llvm-18/bin" >> "$GITHUB_PATH"
       - name: Build and run the fixtures
         run: make check
       - name: Sanitizer build and AST unit tests
@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Flex, Bison and LLVM
-        run: sudo apt-get update && sudo apt-get install -y flex bison llvm-18 && echo "/usr/lib/llvm-18/bin" >> "$GITHUB_PATH"
+        run: sudo apt-get update && sudo apt-get install -y flex bison llvm-18-dev llvm-18 && echo "/usr/lib/llvm-18/bin" >> "$GITHUB_PATH"
       - run: make
       - uses: actions/setup-node@v4
         with:
@@ -86,3 +86,26 @@ jobs:
         with:
           name: alpc-windows
           path: alpc.exe
+
+  docker:
+    name: Deployment images
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API and compiler (includes compiler fixtures)
+        run: docker build -t alpc-api .
+      - name: Build ML service
+        run: docker build -t alpc-ml ml-service
+      - name: Smoke test both services
+        run: bash tests/deploy-smoke.sh
+      - name: Container logs on failure
+        if: failure()
+        run: |
+          docker logs alpc-api-smoke || true
+          docker logs alpc-ml-smoke || true
+          docker logs alpc-mongo-smoke || true
+      - name: Clean up
+        if: always()
+        run: |
+          docker rm -f alpc-api-smoke alpc-ml-smoke alpc-mongo-smoke || true
+          docker network rm alpc-smoke || true

@@ -1,17 +1,23 @@
 const axios = require('axios');
 
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000';
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL ||
+  (process.env.ML_SERVICE_HOST ? `https://${process.env.ML_SERVICE_HOST}` : 'http://127.0.0.1:8000');
+
+const timeout = Number(process.env.ML_TIMEOUT_MS || 5000);
+if (!Number.isSafeInteger(timeout) || timeout <= 0) {
+  throw new Error('ML_TIMEOUT_MS must be a positive integer.');
+}
 
 const client = axios.create({
   baseURL: ML_SERVICE_URL,
-  timeout: 5000,
+  timeout,
 });
 
 // Replace low-level network errors with one that says what to do.
 client.interceptors.response.use(undefined, (err) => {
   if (['ECONNREFUSED', 'ENOTFOUND', 'ECONNABORTED', 'ETIMEDOUT'].includes(err.code)) {
     const e = new Error(
-      `The mastery service is not reachable at ${ML_SERVICE_URL}. Start it with npm run dev:ml and try again; your answers are still on the page.`
+      `The mastery service is not reachable at ${ML_SERVICE_URL}. It may still be starting. Wait a moment and try again; your answers are still on the page.`
     );
     e.code = 'ML_UNAVAILABLE';
     throw e;

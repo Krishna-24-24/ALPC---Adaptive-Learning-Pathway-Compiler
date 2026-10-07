@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: learnsmart-ml
+    runtime: docker
+    plan: free
+    dockerfilePath: ./ml-service/Dockerfile
+    dockerContext: ./ml-service
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "10000"
+  - type: web
+    name: learnsmart-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: ML_SERVICE_HOST
+        fromService:
+          type: web
+          name: learnsmart-ml
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
+      - key: ML_TIMEOUT_MS
+        value: "120000"

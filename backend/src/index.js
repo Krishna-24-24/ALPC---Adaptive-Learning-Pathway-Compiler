@@ -16,10 +16,13 @@ require('./models/CompilerDecision');
 require('./models/StudyProgress');
 const { QUESTIONS, SKILLS } = require('./seed');
 
+const { hostingConfig } = require('./config/hosting');
+const hosting = hostingConfig();
 const app = express();
+app.set('trust proxy', hosting.trustProxy);
 const PORT = process.env.PORT || 5000;
 
-app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
+app.use(cors({ origin: hosting.origin, credentials: true }));
 app.use(express.json({ limit: '64kb' }));
 
 app.get('/health', (_req, res) => {

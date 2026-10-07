@@ -32,6 +32,7 @@ export function useDemoRun() {
   const reqId = useRef(0);
 
   useEffect(() => {
+    let cancelled = false;
     const id = ++reqId.current;
     const source = DEMO_TEMPLATE(performance);
     setState('compiling');
@@ -39,17 +40,17 @@ export function useDemoRun() {
       const t0 = Date.now();
       try {
         const result = await api.compilePathLang(source);
-        if (id !== reqId.current) return;
+        if (cancelled || id !== reqId.current) return;
         setRun({ performance, source, result, live: true, ms: Date.now() - t0 });
         setState('idle');
       } catch {
-        if (id !== reqId.current) return;
+        if (cancelled || id !== reqId.current) return;
         setRun({ performance: RECORDED_PERFORMANCE, source: DEMO_TEMPLATE(RECORDED_PERFORMANCE), result: RECORDED_RUN, live: false });
         setPerformance(RECORDED_PERFORMANCE);
         setState('offline');
       }
     }, 250);
-    return () => clearTimeout(timer);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [performance]);
 
   return { performance, setPerformance, run, state };
