@@ -145,9 +145,23 @@ Any violation ⇒ compilation fails after parsing (non-zero exit), no IR emitted
 - If **any** statement in the program used the `; b` terminator, the program prints the
   final Alignment Score as a binary string (no leading zeros; `0` prints as `0`),
   followed by a newline. Otherwise it prints the score in decimal.
+- **Outcome line.** After the score the program prints a second line naming the outcome
+  that ended the pathway: `outcome L` when an `IF … GOTO L` was taken, `outcome none`
+  when every rule failed and control fell off the end. Callers read the decision from
+  this line; nothing re-evaluates the rules outside the compiled program.
+- Lowering: every `outcome.L` block and the fall-through path branch to one merge block,
+  where `%alpc.selected = phi i32 [-1, %<fallthrough>], [k, %outcome.L_k] …` records
+  which outcome (by declaration index `k`) was reached. After the score is printed,
+  `switch i32 %alpc.selected` jumps to `alpc.report.k`, which calls
+  `puts("outcome L_k")`, or to the default that prints `outcome none`. All names the
+  compiler introduces start with `alpc.`, so they never clash with a Path-Lang
+  variable (a program may `SET score = 1`).
+- `main` returns the score, so `lli` exits with the score modulo 256 (an exit status of
+  `84` is a score of 84, not a failure). Callers read the score from stdout and judge
+  success by the two printed lines, never by the exit status.
 - Worked example (2.1): profile `performance = 60`; `state` 0 → `+= 15` → 15;
-  `IF 60 < 70` true ⇒ GOTO `remedial`; pathway ends; `; b` present ⇒ prints `1111`.
-  (`15` = binary `1111`, matching the PRD.)
+  `IF 60 < 70` true ⇒ GOTO `remedial`; pathway ends; `; b` present ⇒ prints `1111`
+  then `outcome remedial`. (`15` = binary `1111`, matching the PRD.)
 
 ---
 
