@@ -44,7 +44,7 @@ EOF
 ```
 
 `scanner.l` recognises `SET IF GOTO OUTCOME`, identifiers, numbers, the
-comparators `< > ==`, `= += -=`, and the custom **`; b`** binary-output
+comparators `< > == != <= >=`, `= += -=`, and the custom **`; b`** binary-output
 terminator. Point out `SEMI_B` on the last line.
 
 ## 2 · Syntax analysis + Backward Design — (Bison)

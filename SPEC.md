@@ -62,13 +62,16 @@ The `; b` on the final statement selects binary output for the whole program.
 | `IDENT` | `[A-Za-z_][A-Za-z0-9_]*` | matched after keywords |
 | `NUMBER` | `[0-9]+` | non-negative i32 literal |
 | `LT` `GT` `EQ` | `<` `>` `==` | relational operators |
+| `NE` `LE` `GE` | `!=` `<=` `>=` | relational operators (longest match: `<=` is one token, `< =` is two) |
 | `ASSIGN` | `=` | first assignment / declaration |
 | `ADD_ASSIGN` `SUB_ASSIGN` | `+=` `-=` | Fusion-Function updates |
 | `SEMI` | `;` | plain statement terminator |
 | `SEMI_B` | `;[ \t]*b` | **[D]** binary-output terminator; also accepts `;b` |
 | — | `#[^\n]*` | comment, discarded |
 | — | `[ \t\r\n]+` | whitespace, discarded |
-| — | any other char | lexical error: `line N: unexpected character '<c>'` |
+| — | any other char | lexical error: `line N, col C: unexpected character '<c>'` (a lone `!` included) |
+
+Columns are 1-based and count bytes; a tab advances the column by one.
 
 `--dump-tokens` prints one `TYPE  lexeme  (line N)` per line, ending with `EOF`.
 
@@ -87,7 +90,7 @@ outcome_op  : ADD_ASSIGN | SUB_ASSIGN
 set_stmt    : SET IDENT set_op NUMBER term
 set_op      : ASSIGN | ADD_ASSIGN | SUB_ASSIGN
 branch_stmt : IF IDENT rel NUMBER GOTO IDENT term
-rel         : LT | GT | EQ
+rel         : LT | GT | EQ | NE | LE | GE
 term        : SEMI | SEMI_B
 ```
 
@@ -101,8 +104,11 @@ skip to the next terminator, continue; exit non-zero. No crash (Floor F4).
 Checked in one source-order pass over the AST after parsing, so the source order is what matters:
 
 1. **Backward Design** — the `IDENT` after `GOTO` must already have appeared in an
-   `outcome_stmt`. Otherwise:
-   `line N: Backward Design violation: 'X' is referenced before it is declared as an OUTCOME`
+   `outcome_stmt`. Otherwise, if `X` is declared later in the file:
+   `line N, col C: Backward Design violation: 'X' is referenced before it is declared as an OUTCOME`
+   and if `X` is never declared at all:
+   `line N, col C: Backward Design violation: 'X' is referenced but never declared as an OUTCOME (unknown outcome)`
+   (`C` points at the `GOTO` target.)
 2. **Outcome uniqueness** — declaring the same outcome name twice:
    `line N: outcome 'X' is already declared`
 3. **Variable-before-use** **[D]** — the `IDENT` in an `IF` condition must have been
@@ -180,9 +186,45 @@ Any violation ⇒ compilation fails after parsing (non-zero exit), no IR emitted
 | `./alpc --parse-trace FILE` | Parse/reduction trace |
 | `./alpc --dump-ast FILE` | Indented AST, RTTI-driven |
 | `./alpc --emit-ir FILE` (default) | LLVM IR to stdout |
+| `./alpc --json FILE` | Tokens, parse trace, AST, stage statuses, diagnostics and IR as one JSON object on stdout (§4.1) |
 | `./alpc --help` | usage |
 
 Exit codes: `0` ok, `1` lexical/syntax/semantic error, `2` bad CLI usage, `3` internal error.
+
+### 4.1 `--json` output
+
+Compile-time artifacts only; execution stays with `lli` on the returned `ir`.
+Diagnostics are carried in the object, not printed to stderr. Exit code as above.
+
+```json
+{
+  "success": true,
+  "file": "pathway.edu",
+  "binaryOutput": false,
+  "stages": {"lexer": "success", "parser": "success", "semantic": "success", "codegen": "success"},
+  "checks": {"backwardDesign": true},
+  "tokens": [{"line": 1, "col": 1, "type": "OUTCOME", "lexeme": "OUTCOME"}],
+  "trace": ["outcome remedial", "branch performance >= 80 -> advanced"],
+  "ast": {"kind": "Program", "binaryOutput": false, "stmts": [
+    {"kind": "Outcome", "line": 1, "col": 9, "name": "remedial", "adjust": 0},
+    {"kind": "ProfileSet", "line": 3, "col": 5, "name": "performance", "op": "=", "value": 62},
+    {"kind": "CondBranch", "line": 5, "col": 4, "var": "performance", "rel": ">=", "value": 80,
+     "target": "advanced", "targetCol": 27}]},
+  "diagnostics": [],
+  "ir": "; ModuleID = ..."
+}
+```
+
+- `stages.*` is `success`, `error` or `skipped`. The parser always runs (Bison recovers
+  past lexical errors); `semantic` is `skipped` when the parse failed, `codegen` when the
+  program is invalid.
+- `checks.backwardDesign` is `false` when any GOTO targets an undeclared or later-declared
+  outcome, `null` when the parse failed.
+- Each diagnostic: `{"kind": "lexical"|"syntax"|"semantic", "code", "line", "col", "message"}`.
+  Codes: `unexpected-char`, `number-range`, `syntax`, `backward-design`, `unknown-outcome`,
+  `duplicate-outcome`, `reserved-name`, `use-before-set`, `update-before-set`,
+  `adjust-without-state`.
+- `ir` is `null` unless `success`.
 
 ---
 
@@ -230,7 +272,8 @@ Build order (each phase depends on the previous): `diagnostics` → `scanner` �
 - `llvm::` API: `LLVMContext` + `Module` + `IRBuilder<>`; emit textual IR via
   `Module::print`. Match the LLVM version MSYS2 installs (record it in an ADR).
 - Generated Flex/Bison C sources are never edited and never committed.
-- Diagnostics: exactly `line N: message`, lowercase, no trailing period, to stderr.
+- Diagnostics: exactly `line N, col C: message` (or `line N: message` when no column is
+  known), no trailing period, to stderr.
 
 ---
 

@@ -16,10 +16,13 @@
 namespace alpc {
 
 enum SetOp { OP_ASSIGN = 0, OP_ADD = 1, OP_SUB = 2 };
-enum RelOp { REL_LT = 0, REL_GT = 1, REL_EQ = 2 };
+enum RelOp {
+  REL_LT = 0, REL_GT = 1, REL_EQ = 2,
+  REL_NE = 3, REL_LE = 4, REL_GE = 5,
+};
 
 const char *set_op_str(SetOp op);  // "=", "+=", "-="
-const char *rel_op_str(RelOp op);  // "<", ">", "=="
+const char *rel_op_str(RelOp op);  // "<", ">", "==", "!=", "<=", ">="
 
 // Enum order is a preorder walk of the hierarchy so classof() range checks
 // stay valid if a kind ever gains children.
@@ -37,23 +40,25 @@ class ASTNode {
 
   NodeKind kind() const { return kind_; }
   int line() const { return line_; }
+  int col() const { return col_; }  // 1-based column of the node's name; 0 = unknown
 
   // RTTI-driven pretty-print of this node (no trailing newline).
   virtual void print(std::ostream &os) const = 0;
 
  protected:
-  ASTNode(NodeKind k, int line) : kind_(k), line_(line) {}
+  ASTNode(NodeKind k, int line, int col) : kind_(k), line_(line), col_(col) {}
 
  private:
   const NodeKind kind_;
   const int line_;
+  const int col_;
 };
 
 // SET <name> = / += / -= <value>
 class ProfileSet final : public ASTNode {
  public:
-  ProfileSet(int line, std::string name, SetOp op, int value)
-      : ASTNode(NK_ProfileSet, line),
+  ProfileSet(int line, std::string name, SetOp op, int value, int col = 0)
+      : ASTNode(NK_ProfileSet, line, col),
         name(std::move(name)),
         op(op),
         value(value) {}
@@ -69,12 +74,15 @@ class ProfileSet final : public ASTNode {
 // IF <var> <rel> <value> GOTO <target>
 class CondBranch final : public ASTNode {
  public:
-  CondBranch(int line, std::string var, RelOp rel, int value, std::string target)
-      : ASTNode(NK_CondBranch, line),
+  // `col` locates the condition variable, `target_col` the GOTO target.
+  CondBranch(int line, std::string var, RelOp rel, int value, std::string target,
+             int col = 0, int target_col = 0)
+      : ASTNode(NK_CondBranch, line, col),
         var(std::move(var)),
         rel(rel),
         value(value),
-        target(std::move(target)) {}
+        target(std::move(target)),
+        target_col(target_col) {}
 
   static bool classof(const ASTNode *n) { return n->kind() == NK_CondBranch; }
   void print(std::ostream &os) const override;
@@ -83,6 +91,7 @@ class CondBranch final : public ASTNode {
   const RelOp rel;
   const int value;
   const std::string target;
+  const int target_col;
 };
 
 // OUTCOME <name> [ += n | -= n ]
@@ -90,8 +99,8 @@ class CondBranch final : public ASTNode {
 // outcome (SPEC 2.5); 0 for a plain declaration.
 class Outcome final : public ASTNode {
  public:
-  Outcome(int line, std::string name, int adjust = 0)
-      : ASTNode(NK_Outcome, line), name(std::move(name)), adjust(adjust) {}
+  Outcome(int line, std::string name, int adjust = 0, int col = 0)
+      : ASTNode(NK_Outcome, line, col), name(std::move(name)), adjust(adjust) {}
 
   static bool classof(const ASTNode *n) { return n->kind() == NK_Outcome; }
   void print(std::ostream &os) const override;

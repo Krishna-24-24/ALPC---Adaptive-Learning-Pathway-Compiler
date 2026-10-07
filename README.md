@@ -42,7 +42,7 @@ ALPC/
 │   ├── parser.y              # Bison 3.8.2 LALR(1) grammar
 │   ├── ast.h / ast.cpp       # AST hierarchy with LLVM-style RTTI (classof, isa, dyn_cast)
 │   ├── codegen.h / codegen.cpp # LLVM IR code generator
-│   └── main.cpp              # CLI driver (--dump-tokens, --emit-ir, etc.)
+│   └── main.cpp              # CLI driver (--dump-tokens, --emit-ir, --json, etc.)
 │
 ├── tests/                    # Compiler golden fixtures (14 valid, 10 invalid)
 ├── examples/                 # Demonstration programs (pathway.edu)
@@ -95,7 +95,7 @@ All commands run directly in `C:\Users\Krishna\Projects\ALPC`:
 
 | Command | Action |
 |---|---|
-| `npm test` | Runs the full PRD Section 33 automated integration test suite (8 tests). |
+| `npm test` | Runs the PRD Section 33 integration suite (14 tests; the 6 end-to-end ones run the real `alpc.exe` + `lli`, so rebuild the compiler first). |
 | `npm run seed` | Seeds the MongoDB database with initial DSA skills and questions. |
 | `npm run demo:compiler` | Runs the full 5-stage compiler pipeline demo on `examples/pathway.edu`. |
 | `npm run build:compiler` | Recompiles `alpc.exe` using Flex, Bison, and g++ (takes ~3s). |
@@ -149,6 +149,21 @@ npm test
   ✓ Test 6: Token parsing handles keywords, identifiers, and literals
   ✓ Test 7: AST parser constructs hierarchical tree from dump-ast
   ✓ Test 8: Binary output (; b) parsing
+  ✓ Run output: decimal score made of 0s and 1s is not read as binary
+  ✓ E2E: default pathway compiles and runs (score 40)
+  ✓ E2E: default pathway compiles and runs (score 65)
+  ✓ E2E: default pathway compiles and runs (score 90)
+  ✓ E2E: Alignment Score comes from execution (state += 15, and ; b)
+  ✓ E2E: unknown outcome is rejected with line and column
 
-Results: 8 passed, 0 failed.
+Results: 14 passed, 0 failed.
+```
+
+The E2E tests use `ALPC_BIN` / `LLI_BIN` (same variables as the backend) and are skipped
+when the compiler binary is not found.
+
+Compiler fixtures (lexer, parser, AST, IR, execution and `--json` goldens):
+
+```bash
+make check
 ```

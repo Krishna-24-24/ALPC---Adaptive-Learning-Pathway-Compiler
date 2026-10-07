@@ -1,0 +1,4 @@
+# "> =" with a space is two tokens, not ">=": a syntax error.
+OUTCOME a;
+SET x = 1;
+IF x > = 1 GOTO a;

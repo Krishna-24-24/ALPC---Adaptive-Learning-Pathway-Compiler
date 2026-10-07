@@ -1,0 +1,13 @@
+# PRD section 32 pathway. Outcome adjustments make the chosen branch observable:
+# remedial -> 1, core -> 2, advanced -> 3.
+OUTCOME remedial += 1;
+OUTCOME core += 2;
+OUTCOME advanced += 3;
+
+SET performance = 90;
+SET mastery = 58;
+SET state = 0;
+
+IF performance < 50 GOTO remedial;
+IF performance < 80 GOTO core;
+IF performance >= 80 GOTO advanced;

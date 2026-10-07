@@ -14,6 +14,9 @@ const char *alpc_token_name(int kind) {
     case LT:         return "LT";
     case GT:         return "GT";
     case EQ:         return "EQ";
+    case NE:         return "NE";
+    case LE:         return "LE";
+    case GE:         return "GE";
     case ASSIGN:     return "ASSIGN";
     case ADD_ASSIGN: return "ADD_ASSIGN";
     case SUB_ASSIGN: return "SUB_ASSIGN";

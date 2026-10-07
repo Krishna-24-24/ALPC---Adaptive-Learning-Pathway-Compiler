@@ -86,6 +86,7 @@ function deriveOutcome(pathLangSource, alignmentScore) {
     else if (op === '==') taken = val === threshold;
     else if (op === '>=') taken = val >= threshold;
     else if (op === '<=') taken = val <= threshold;
+    else if (op === '!=') taken = val !== threshold;
 
     if (taken) return target;
   }

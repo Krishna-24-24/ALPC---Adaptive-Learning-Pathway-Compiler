@@ -33,32 +33,35 @@ async function runBin(bin, args, cwd) {
       maxBuffer: MAX_BUFFER,
       windowsHide: true,
     });
-    return { stdout: stdout || '', stderr: stderr || '', exitCode: 0 };
+    return { stdout: stdout || '', stderr: stderr || '', exitCode: 0, signal: null };
   } catch (err) {
     if (err.code === 'ENOENT') {
       return {
         stdout: '',
         stderr: `Compiler binary not found: "${bin}". Build ALPC first (make) or configure ALPC_BIN in backend/.env.`,
         exitCode: 127,
+        signal: null,
       };
     }
     return {
       stdout: err.stdout || '',
       stderr: err.stderr || err.message || 'unknown error',
       exitCode: typeof err.code === 'number' ? err.code : 1,
+      signal: err.signal || (err.killed ? 'SIGTERM' : null),
     };
   }
 }
 
 /**
- * Parse lli stdout: either a decimal integer (normal mode) or
- * a binary string like "1111" (; b mode).
+ * Parse lli stdout: a decimal integer (normal mode) or a binary string like
+ * "1111" (; b mode). The mode must come from the compiler: in normal mode a
+ * score such as 10 is also all 0s and 1s, so the text alone is ambiguous.
  */
-function parseRunOutput(stdout) {
+function parseRunOutput(stdout, binaryMode) {
   const raw = stdout.trim();
   if (!raw) return { alignmentScore: null, binaryOutput: null };
 
-  if (/^[01]+$/.test(raw)) {
+  if (binaryMode && /^[01]+$/.test(raw)) {
     return {
       binaryOutput: raw,
       alignmentScore: parseInt(raw, 2),
@@ -131,13 +134,19 @@ async function compile(source) {
     irSource = irRes.stdout;
 
     // ── Stage 5: lli execution ────────────────────────────────────
+    // The compiled @main returns the Alignment Score, so lli's exit status IS
+    // the score (truncated by the OS) and is non-zero for any non-zero score.
+    // Success = lli ran to completion (no signal/timeout, binary found) and
+    // printed a score; the printed value is authoritative, not the exit code.
     await writeFile(irPath, irSource, 'utf8');
+    const binaryMode = /^binary-output$/m.test(parseRes.stdout);
     const runRes = await runBin(LLI_BIN, ['input.ll'], workDir);
-    const runOk  = runRes.exitCode === 0;
+    const parsed = parseRunOutput(runRes.stdout, binaryMode);
+    const runOk  = runRes.signal === null && runRes.exitCode !== 127
+                   && parsed.alignmentScore !== null;
     stages.push({ id: 'run', status: runOk ? 'success' : 'error', ...runRes });
 
     if (runOk) {
-      const parsed = parseRunOutput(runRes.stdout);
       alignmentScore = parsed.alignmentScore;
       binaryOutput   = parsed.binaryOutput;
     }
@@ -148,4 +157,4 @@ async function compile(source) {
   }
 }
 
-module.exports = { compile };
+module.exports = { compile, parseRunOutput };

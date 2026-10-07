@@ -10,12 +10,14 @@
  *   Test 5: Backward Design violation -> semantic error
  *   Test 6: Malformed Path-Lang -> syntax error
  *   Test 7: LLVM verification failure -> compilation failure
+ * plus end-to-end runs through the real ALPC binary (set ALPC_BIN / LLI_BIN).
  */
 
 const assert = require('assert');
+const fs = require('fs');
 const { generatePathLang, generateForStudent, validate } = require('../services/pathwayGenerator');
 const { deriveOutcome, parseTokens, parseAst, parseCompilerResult } = require('../services/resultParser');
-const { compile } = require('../services/alpcRunner');
+const { compile, parseRunOutput } = require('../services/alpcRunner');
 
 let passed = 0;
 let failed = 0;
@@ -167,6 +169,60 @@ async function main() {
     assert.strictEqual(parsed.binaryOutput, '1001000', 'Binary output should be 1001000');
     assert.strictEqual(parsed.outcome, 'core', 'Outcome should be core');
   });
+
+  await runTest('Run output: decimal score made of 0s and 1s is not read as binary', () => {
+    assert.deepStrictEqual(parseRunOutput('10\n', false), { alignmentScore: 10, binaryOutput: null });
+    assert.deepStrictEqual(parseRunOutput('1010\n', true), { alignmentScore: 10, binaryOutput: '1010' });
+  });
+
+  // ── End-to-end against the real compiler ─────────────────────────────────
+  // These invoke ALPC + lli instead of mocks. Point ALPC_BIN (and LLI_BIN) at
+  // a built compiler; skipped when the binary is not present.
+  const alpcBin = process.env.ALPC_BIN || 'C:/Users/Krishna/Projects/ALPC/alpc.exe';
+  if (!fs.existsSync(alpcBin)) {
+    console.log(`  - skipped real-compiler tests (ALPC_BIN not found: ${alpcBin})`);
+  } else {
+    // The default rules end with `performance >= 85`; before the compiler
+    // supported >=, every generated default pathway failed to parse.
+    for (const [score, expected] of [[40, 1], [65, 2], [90, 4]]) {
+      await runTest(`E2E: default pathway compiles and runs (score ${score})`, async () => {
+        const src = generateForStudent({ studentData: { performance: score, mastery: 0.5 } })
+          // Make the chosen branch observable: remedial 1, practice 2, core 3, advanced 4.
+          .replace('OUTCOME remedial;', 'OUTCOME remedial += 1;')
+          .replace('OUTCOME practice;', 'OUTCOME practice += 2;')
+          .replace('OUTCOME core;', 'OUTCOME core += 3;')
+          .replace('OUTCOME advanced;', 'OUTCOME advanced += 4;');
+        assert(src.includes('>= 85'), 'Default rules should exercise >=');
+        const res = await compile(src);
+        const failedStage = res.stages.find(st => st.status === 'error');
+        assert.strictEqual(res.success, true, `compile failed: ${failedStage && failedStage.stderr}`);
+        assert.strictEqual(res.alignmentScore, expected,
+          `Expected score ${expected} from the compiled branch, got ${res.alignmentScore}`);
+      });
+    }
+
+    await runTest('E2E: Alignment Score comes from execution (state += 15, and ; b)', async () => {
+      const base = 'OUTCOME core;\nSET performance = 72;\nSET state = 0;\nSET state += 15;\nIF performance >= 50 GOTO core';
+      const dec = await compile(base + ';\n');
+      assert.strictEqual(dec.success, true, 'decimal run should succeed');
+      assert.strictEqual(dec.alignmentScore, 15);
+      assert.strictEqual(dec.binaryOutput, null);
+      const bin = await compile(base + '; b\n');
+      assert.strictEqual(bin.success, true, 'binary run should succeed');
+      assert.strictEqual(bin.binaryOutput, '1111');
+      assert.strictEqual(bin.alignmentScore, 15);
+    });
+
+    await runTest('E2E: unknown outcome is rejected with line and column', async () => {
+      const res = await compile('OUTCOME core;\nSET performance = 70;\nIF performance < 50 GOTO unknown;\n');
+      assert.strictEqual(res.success, false, 'Invalid program must not execute');
+      const errStage = res.stages.find(st => st.status === 'error');
+      assert(errStage, 'Expected a failing stage');
+      assert(/line 3, col 26: Backward Design violation: 'unknown'/.test(errStage.stderr),
+        `Unexpected diagnostic: ${errStage.stderr}`);
+      assert(!res.stages.some(st => st.id === 'run' && st.status === 'success'), 'Must not run');
+    });
+  }
 
   console.log(`\nResults: ${passed} passed, ${failed} failed.\n`);
   if (failed > 0) process.exit(1);
